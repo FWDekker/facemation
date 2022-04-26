@@ -17,9 +17,10 @@ Path(output_dir).mkdir(exist_ok=True)
 input_files = os.listdir(input_dir)
 
 # Pre-process images
-print("Pre-processing")
+print("# Pre-processing")
 all_eyes = []
 for input_file in glob.glob(f"{input_dir}/*.jpg"):
+    print(input_file)
     image = cv2.imread(input_file)
 
     eyes = eye_cascade.detectMultiScale(image, 1.1, 4).tolist()
@@ -33,9 +34,11 @@ avg_center = np.mean(np.mean(all_eyes[:, :, 0:2], axis=0), axis=0)
 avg_distance = np.mean([math.sqrt(it[0] ** 2 + it[1] ** 2) for it in all_eyes[:, 1, 0:2] - avg_center])
 
 # Translate, rotate, resize
-print("Translating, rotating, resizing")
+print("# Translating, rotating, resizing")
 max_width, max_height = [0, 0]
 for input_file in glob.glob(f"{input_dir}/*.jpg"):
+    print(input_file)
+
     image = cv2.imread(input_file)
     height, width = image.shape[:2]
 

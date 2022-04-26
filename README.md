@@ -6,6 +6,7 @@ Given a sequence of input photos, rotates and centres the photos, and outputs th
 ## Requirements
 - Python 3.9
 - Install requirements from `requirements.txt`
+- [FFmpeg](https://ffmpeg.org/) (e.g. `apt install ffmpeg`)
 
 ## How to use
 1. Put images in `input/` folder.
@@ -14,4 +15,9 @@ Given a sequence of input photos, rotates and centres the photos, and outputs th
     $> ls -v | cat -n | while read n f; do mv -n "$f" "$n.jpg"; done
     ```
 3. Run this script.
-4. Run ffmpeg on the `output/` folder.
+4. Run ffmpeg on the `output/` folder, for example:
+   ```bash
+   cd output/
+   ffmpeg -f image2 -r 24 -i %d.jpg -vcodec libx264 -crf 24 out.mp4
+   ```
+   You can add `-vf "transpose=2"` to rotate.
