@@ -21,7 +21,8 @@ output_temp_dir = "output/temp/"
 
 face_selection_override = {f"{input_dir}36.jpg": (lambda it: it.rect.top())}
 
-shutil.rmtree(output_dir)
+if Path(output_dir).exists():
+    shutil.rmtree(output_dir)
 Path(output_dir).mkdir(exist_ok=True)
 Path(output_error_dir).mkdir(exist_ok=True)
 Path(output_final_dir).mkdir(exist_ok=True)

@@ -17,6 +17,8 @@ Given a sequence of input photos, rotates and centres the photos, and outputs th
     ls -v | cat -n | while read n f; do mv -n "$f" "$n.jpg"; done
     ```
 3. Run this script.
+   1. If multiple faces are detected, add a face sorting function for the image to `face_selection_override`.
+      The sorting function should return the desired face in the first position.
 4. Run ffmpeg on the `output/` folder, for example:
    ```bash
    cd output/
