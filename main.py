@@ -15,13 +15,17 @@ enable_debug = False
 
 input_dir = "input/"
 output_dir = "output/"
-output_temp_dir = "output/temp/"
+output_error_dir = "output/error/"
 output_final_dir = "output/final/"
+output_temp_dir = "output/temp/"
+
+face_selection_override = {f"{input_dir}36.jpg": (lambda it: it.rect.top())}
 
 shutil.rmtree(output_dir)
 Path(output_dir).mkdir(exist_ok=True)
-Path(output_temp_dir).mkdir(exist_ok=True)
+Path(output_error_dir).mkdir(exist_ok=True)
 Path(output_final_dir).mkdir(exist_ok=True)
+Path(output_temp_dir).mkdir(exist_ok=True)
 
 input_files = os.listdir(input_dir)
 shape_predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
@@ -30,7 +34,9 @@ shape_predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
 eyes_left = {}
 eyes_right = {}
 for input_file in tqdm(glob.glob(f"{input_dir}/*.jpg"), desc="Pre-processing"):
-    image = cv2.cvtColor(cv2.imread(input_file), cv2.COLOR_BGR2RGB)
+    image_cv2 = cv2.imread(input_file)
+    image = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2RGB)
+
     detector = dlib.get_frontal_face_detector()
     detections = detector(image, 1)
 
@@ -39,8 +45,19 @@ for input_file in tqdm(glob.glob(f"{input_dir}/*.jpg"), desc="Pre-processing"):
         faces.append(shape_predictor(image, detection))
 
     if len(faces) > 1:
-        raise Exception(f"Too many faces: Found {len(faces)} in '{input_file}'.")
-    face = faces[0]
+        if input_file in face_selection_override:
+            face = sorted(list(faces), key=face_selection_override[input_file])[0]
+        else:
+            bb = [it.rect for it in faces]
+            bb = [((it.left(), it.top()), (it.right(), it.bottom())) for it in bb]
+            for it in bb:
+                image_cv2 = cv2.rectangle(image_cv2, it[0], it[1], (255, 0, 0), 5)
+            cv2.imwrite(f"{output_error_dir}/{os.path.basename(input_file)}", image_cv2)
+
+            raise Exception(f"Too many faces: Found {len(faces)} in '{input_file}'. "
+                            f"See also file in '{output_error_dir}'.")
+    else:
+        face = faces[0]
 
     eyes_left[input_file] = np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(42, 48)]), axis=0)
     eyes_right[input_file] = np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(36, 42)]), axis=0)
