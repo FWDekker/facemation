@@ -156,3 +156,5 @@ cython_debug/
 ## Custom
 input/
 output/
+*.dat
+*.xml
