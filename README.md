@@ -17,11 +17,13 @@ Given a sequence of input photos, rotates and centres the photos, and outputs th
     ls -v | cat -n | while read n f; do mv -n "$f" "$n.jpg"; done
     ```
 3. Run this script.
-   1. If multiple faces are detected, add a face sorting function for the image to `face_selection_override`.
+
+   If multiple faces are detected, add a face sorting function for the image to `face_selection_override`.
       The sorting function should return the desired face in the first position.
-4. Run ffmpeg on the `output/` folder, for example:
+5. Run ffmpeg on the `output/` folder, for example:
    ```bash
-   cd output/
+   cd output/final/
    ffmpeg -f image2 -r 24 -i %d.jpg -vcodec libx264 -crf 24 out.mp4
    ```
-   You can add `-vf "transpose=2"` to rotate.
+   * You can add `-vf "transpose=2"` to rotate.
+   * You can add `-vf "tpad=stop_mode=clone:stop_duration=3"` to freeze the last frame for 3 seconds.

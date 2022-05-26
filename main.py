@@ -21,6 +21,7 @@ output_temp_dir = "output/temp/"
 
 face_selection_override = {f"{input_dir}36.jpg": (lambda it: it.rect.top())}
 
+# Directory management
 if Path(output_dir).exists():
     shutil.rmtree(output_dir)
 Path(output_dir).mkdir(exist_ok=True)
@@ -34,7 +35,7 @@ shape_predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
 # Pre-process
 eyes_left = {}
 eyes_right = {}
-for input_file in tqdm(glob.glob(f"{input_dir}/*.jpg"), desc="Pre-processing"):
+for idx, input_file in enumerate(tqdm(sorted(glob.glob(f"{input_dir}/*.jpg")), desc="Pre-processing")):
     image_cv2 = cv2.imread(input_file)
     image = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2RGB)
 
@@ -76,7 +77,7 @@ eyes_center_avg = np.mean([eyes_left_avg, eyes_right_avg], axis=0)
 
 # Translate, rotate, resize
 width_min, height_min = [1e99, 1e99]
-for input_file in tqdm(glob.glob(f"{input_dir}/*.jpg"), desc="Translating, rotating, resizing"):
+for idx, input_file in enumerate(tqdm(sorted(glob.glob(f"{input_dir}/*.jpg")), desc="Translating, rotating, resizing")):
     image = cv2.imread(input_file)
 
     height, width = image.shape[:2]
@@ -107,7 +108,7 @@ for input_file in tqdm(glob.glob(f"{input_dir}/*.jpg"), desc="Translating, rotat
     image = cv2.resize(image, (int(width * scale), int(height * scale)))
 
     # Write
-    cv2.imwrite(f"{output_temp_dir}/{os.path.basename(input_file)}", image)
+    cv2.imwrite(f"{output_temp_dir}/{idx}.jpg", image)
 
     # Store largest image seen
     height_new, width_new = image.shape[:2]
@@ -118,7 +119,7 @@ width_min = width_min if width_min % 2 == 0 else width_min - 1
 height_min = height_min if height_min % 2 == 0 else height_min - 1
 
 # Reshape
-for input_file in tqdm(glob.glob(f"{output_temp_dir}/*.jpg"), desc="Reshaping"):
+for idx, input_file in enumerate(tqdm(sorted(glob.glob(f"{output_temp_dir}/*.jpg")), desc="Reshaping")):
     image = cv2.imread(input_file)
     height, width = image.shape[:2]
 
@@ -131,4 +132,4 @@ for input_file in tqdm(glob.glob(f"{output_temp_dir}/*.jpg"), desc="Reshaping"):
     height_end = height_start + height_min
 
     image = image[height_start:height_end, width_start:width_end]
-    cv2.imwrite(f"{output_final_dir}/{os.path.basename(input_file)}", image)
+    cv2.imwrite(f"{output_final_dir}/{idx}.jpg", image)
