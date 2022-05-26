@@ -3,6 +3,7 @@ import hashlib
 import math
 import os
 import shutil
+import sys
 from pathlib import Path
 
 import cv2
@@ -50,11 +51,18 @@ if __name__ == "__main__":
     if Path(output_temp_dir).exists():
         shutil.rmtree(output_temp_dir)
 
+    Path(input_dir).mkdir(exist_ok=True)
     Path(output_dir).mkdir(exist_ok=True)
     Path(output_cache_dir).mkdir(exist_ok=True)
     Path(output_error_dir).mkdir(exist_ok=True)
     Path(output_final_dir).mkdir(exist_ok=True)
     Path(output_temp_dir).mkdir(exist_ok=True)
+
+    # Validation
+    if len(glob.glob(f"{input_dir}/*.jpg")) == 0:
+        print(f"No images detected in '{Path(input_dir).absolute()}'. Are you sure you put them in the right place?",
+              file=sys.stderr)
+        sys.exit(-1)
 
     # Pre-process
     eyes_left = {}
@@ -92,8 +100,11 @@ if __name__ == "__main__":
                     image_cv2 = cv2.rectangle(image_cv2, it[0], it[1], (255, 0, 0), 5)
                 cv2.imwrite(f"{output_error_dir}/{os.path.basename(input_file)}", image_cv2)
 
-                raise Exception(f"Too many faces: Found {len(faces)} in '{input_file}'. "
-                                f"See also file in '{output_error_dir}'.")
+                print(
+                    f"Too many faces: Found {len(faces)} in '{input_file}'. "
+                    f"See also file in '{output_error_dir}'.",
+                    file=sys.stderr)
+                sys.exit(-2)
         else:
             face = faces[0]
 
