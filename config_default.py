@@ -8,6 +8,9 @@ from datetime import datetime
 config = {
     # Set to `True` to visualize debug information in the output.
     "enable_debug": False,
+    # Set to `True` to store pre-processed information on disk to speed up future runs. Stored information is associated
+    # with a hash of the image so that renaming the file does not cause the information to be lost.
+    "enable_caching": True,
     # Predictor to use for finding facial features. You probably don't need to change this.
     "shape_predictor": "shape_predictor_68_face_landmarks.dat",
 
@@ -36,6 +39,8 @@ config = {
     # The easiest way to configure overrides is based on the position of the face, as shown in the default examples
     # below. To find which face you need, first run the main script, and once it fails because it has detected multiple
     # faces, check the image in the `output_error_dir` directory and add an appropriate override function.
+    #
+    # If `enable_caching` is enabled, the override is computed only when the image is encountered the first time.
     "face_selection_override": {
         # Selects the face whose top edge is closest to the top of the image.
         f"example_top_top": (lambda it: it.rect.top()),

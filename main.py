@@ -110,7 +110,7 @@ def main() -> int:
         image_cache_file = Path(f"{cfg.output_cache_dir}/{image_hash}")
 
         # Read from cache if applicable
-        if image_cache_file.exists():
+        if cfg.enable_caching and image_cache_file.exists():
             eyes_both = np.loadtxt(image_cache_file)
             eyes_left[input_file] = eyes_both[0]
             eyes_right[input_file] = eyes_both[1]
@@ -152,8 +152,9 @@ def main() -> int:
         # Store results
         eyes_left[input_file] = np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(42, 48)]), axis=0)
         eyes_right[input_file] = np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(36, 42)]), axis=0)
-        # noinspection PyTypeChecker
-        np.savetxt(image_cache_file, np.vstack([eyes_left[input_file], eyes_right[input_file]]))
+        if cfg.enable_caching:
+            # noinspection PyTypeChecker
+            np.savetxt(image_cache_file, np.vstack([eyes_left[input_file], eyes_right[input_file]]))
 
     # Calculate statistics
     eyes_dist = {it: math.dist(eyes_left[it], eyes_right[it]) for it in eyes_left.keys()}
