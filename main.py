@@ -6,6 +6,7 @@ import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
+from traceback import print_exception
 
 import cv2
 import dlib
@@ -88,15 +89,22 @@ def main():
     if len(glob.glob(f"{input_dir}/*.jpg")) == 0:
         print(f"No images detected in '{Path(input_dir).absolute()}'. Are you sure you put them in the right place?",
               file=sys.stderr)
-        sys.exit(-1)
+        return -1
 
     # Pre-process
     image_dates = {}
     eyes_left = {}
     eyes_right = {}
-    for idx, input_file in enumerate(tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")), desc="Pre-processing")):
-        # TODO: Error check the automatic conversion
-        image_dates[idx] = filename_to_date(Path(input_file).stem)
+
+    pbar = tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")), desc="Pre-processing")
+    for idx, input_file in enumerate(pbar):
+        try:
+            image_dates[idx] = filename_to_date(Path(input_file).stem)
+        except Exception as exception:
+            pbar.close()
+            print_exception(exception, file=sys.stderr)
+            print("\nFailed to parse date from filename.", file=sys.stderr)
+            return -1
 
         image_hash = sha256sum(input_file)
         image_cache_file = Path(f"{output_cache_dir}/{image_hash}")
@@ -134,7 +142,7 @@ def main():
                     f"Too many faces: Found {len(faces)} in '{input_file}'. "
                     f"See also file in '{output_error_dir}'.",
                     file=sys.stderr)
-                sys.exit(-2)
+                return -1
         else:
             face = faces[0]
 
@@ -200,8 +208,8 @@ def main():
     height_min = height_min if height_min % 2 == 0 else height_min - 1
 
     # Crop and add text
-    for idx, input_file in enumerate(tqdm(natsorted(glob.glob(f"{output_temp_dir}/*.jpg")),
-                                          desc="Cropping and adding text")):
+    pbar = tqdm(natsorted(glob.glob(f"{output_temp_dir}/*.jpg")), desc="Cropping and adding text")
+    for idx, input_file in enumerate(pbar):
         image = cv2.imread(input_file)
         height, width = image.shape[:2]
 
@@ -217,7 +225,14 @@ def main():
         image = image[height_start:height_end, width_start:width_end]
 
         # Add text
-        caption = date_to_caption(image_dates[idx])
+        try:
+            caption = date_to_caption(image_dates[idx])
+        except Exception as exception:
+            pbar.close()
+            print_exception(exception, file=sys.stderr)
+            print("\nFailed to convert date to caption.", file=sys.stderr)
+            return -1
+
         image = write_on_image(image, caption, (0.05, 0.95), 0.05)
 
         # Write
