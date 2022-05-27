@@ -15,9 +15,6 @@ config = {
     "output_error_dir": "output/error/",
     # (Relative) directory to store the final processed images in.
     "output_final_dir": "output/final/",
-    # (Relative) directory to store images in that are currently being processed.
-    # TODO: Move to a real temp dir
-    "output_temp_dir": "output/temp/",
 
     # TODO: Document these clearly
     # Converts the filename of an image to the date on which it was taken.

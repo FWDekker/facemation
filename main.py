@@ -5,6 +5,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from traceback import print_exception
 from types import SimpleNamespace
 
@@ -15,15 +16,16 @@ import numpy as np
 from natsort import natsorted
 from tqdm import tqdm
 
-from config_default import config as cfg_default
-if Path("config.py").exists():
-    # noinspection PyPackageRequirements
-    from config import config as cfg_user
-else:
-    cfg_user = {}
 
+# Loads config from `config_default.py`, and overrides it with config in `config.py` if it exists.
+def load_config() -> SimpleNamespace:
+    from config_default import config as cfg_default
+    if Path("config.py").exists():
+        from config import config as cfg_user
+    else:
+        cfg_user = {}
 
-cfg = SimpleNamespace(**(cfg_default | cfg_user))
+    return SimpleNamespace(**(cfg_default | cfg_user))
 
 
 # Calculates hash of given file
@@ -57,7 +59,9 @@ def write_on_image(image: np.ndarray, text: str, pos: [float, float], text_heigh
 
 
 # Main entry point
-def main():
+def main() -> int:
+    cfg = load_config()
+
     if not Path(cfg.shape_predictor).exists():
         # TODO: Remove duplicate code from error handling.
         print(f"Face detector '{Path(cfg.shape_predictor).absolute()}' could not be found. "
@@ -67,19 +71,18 @@ def main():
 
     shape_predictor = dlib.shape_predictor(cfg.shape_predictor)
 
-    # Delete old files
+    # File management
     if Path(cfg.output_error_dir).exists():
         shutil.rmtree(cfg.output_error_dir)
     if Path(cfg.output_final_dir).exists():
         shutil.rmtree(cfg.output_final_dir)
-    if Path(cfg.output_temp_dir).exists():
-        shutil.rmtree(cfg.output_temp_dir)
 
     Path(cfg.input_dir).mkdir(exist_ok=True)
     Path(cfg.output_cache_dir).mkdir(exist_ok=True)
     Path(cfg.output_error_dir).mkdir(exist_ok=True)
     Path(cfg.output_final_dir).mkdir(exist_ok=True)
-    Path(cfg.output_temp_dir).mkdir(exist_ok=True)
+
+    temp_dir = TemporaryDirectory(prefix="facemation-")
 
     # Validation
     if len(glob.glob(f"{cfg.input_dir}/*.jpg")) == 0:
@@ -195,7 +198,7 @@ def main():
         image = cv2.resize(image, (int(width * scale), int(height * scale)))
 
         # Write
-        cv2.imwrite(f"{cfg.output_temp_dir}/{idx}.jpg", image)
+        cv2.imwrite(f"{temp_dir.name}/{idx}.jpg", image)
 
         # Store smallest image seen
         height_new, width_new = image.shape[:2]
@@ -206,7 +209,7 @@ def main():
     height_min = height_min if height_min % 2 == 0 else height_min - 1
 
     # Crop and add text
-    pbar = tqdm(natsorted(glob.glob(f"{cfg.output_temp_dir}/*.jpg")), desc="Cropping and adding text")
+    pbar = tqdm(natsorted(glob.glob(f"{temp_dir.name}/*.jpg")), desc="Cropping and adding text")
     for idx, input_file in enumerate(pbar):
         image = cv2.imread(input_file)
         height, width = image.shape[:2]
