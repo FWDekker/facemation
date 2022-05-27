@@ -63,7 +63,6 @@ def main() -> int:
     cfg = load_config()
 
     if not Path(cfg.shape_predictor).exists():
-        # TODO: Remove duplicate code from error handling.
         print(f"Face detector '{Path(cfg.shape_predictor).absolute()}' could not be found. "
               f"Make sure to download the file from the link in the README and place it in the same directory as "
               f"'main.py'.", file=sys.stderr)
@@ -103,7 +102,8 @@ def main() -> int:
         except Exception as exception:
             pbar.close()
             print_exception(exception, file=sys.stderr)
-            print("\nFailed to parse date from filename.", file=sys.stderr)
+            print("\nFailed to parse date from filename. Check if 'filename_to_date' in your configuration matches the "
+                  "filenames in the input directory.", file=sys.stderr)
             return -1
 
         image_hash = sha256sum(input_file)
@@ -138,10 +138,12 @@ def main() -> int:
                     image_cv2 = cv2.rectangle(image_cv2, it[0], it[1], (255, 0, 0), 5)
                 cv2.imwrite(f"{cfg.output_error_dir}/{os.path.basename(input_file)}", image_cv2)
 
-                # TODO: Add an explanation of what to do here, and remove it from the README.
                 print(
                     f"Too many faces: Found {len(faces)} in '{input_file}'. "
-                    f"See also file in '{cfg.output_error_dir}'.",
+                    f"The image has been stored in '{Path(cfg.output_error_dir).absolute()}' with squares drawn around "
+                    f"all faces that were found. "
+                    f"You can select which face should be used by adjusting the 'face_selection_override' option; "
+                    f"see 'config_default.py' for more information.",
                     file=sys.stderr)
                 return -1
         else:
@@ -231,7 +233,8 @@ def main() -> int:
         except Exception as exception:
             pbar.close()
             print_exception(exception, file=sys.stderr)
-            print("\nFailed to convert date to caption.", file=sys.stderr)
+            print("\nFailed to convert date to caption. Your 'filename_to_date' has been configured wrongly. Check your"
+                  "configuration for more details.", file=sys.stderr)
             return -1
 
         image = write_on_image(image, caption, (0.05, 0.95), 0.05)
