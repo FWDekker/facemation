@@ -19,14 +19,15 @@ config = {
     # TODO: Move to a real temp dir
     "output_temp_dir": "output/temp/",
 
-    # Converts the filename of an image to the date on which it was taken.
     # TODO: Document these clearly
-    "filename_to_date":
-        (lambda it: datetime.strptime(it if it.count("_") == 2 else it[:-4], "IMG_%Y%m%d_%H%M%S").date()),
+    # Converts the filename of an image to the date on which it was taken.
+    "filename_to_date": (lambda it: datetime.strptime("IMG_%Y%m%d_%H%M%S", it).date()),
     # Converts the date of an image to an appropriate caption.
-    "date_to_caption":
-        (lambda it: f"Day {(it - datetime(year=2021, month=12, day=23).date()).days}"),
-
+    "date_to_caption": (lambda it: it.strftime("%Y-%m-%d")),
     # Selects the face to use when multiple faces are found in an image.
-    "face_selection_override": {"IMG_20220112_124422": (lambda it: it.rect.top())}
+    # It's probably easiest to configure this each time the script fails, rather than pre-emptively filling it in.
+    "face_selection_override": {f"example_1": (lambda it: it.rect.top()),  # Selects the highest face
+                                f"example_2": (lambda it: -it.rect.top()),  # Selects the lowest face
+                                f"example_3": (lambda it: it.rect.left()),  # Selects the left-most face
+                                f"example_4": (lambda it: -it.rect.left())}  # Selects the right-most
 }

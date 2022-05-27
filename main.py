@@ -16,7 +16,11 @@ from natsort import natsorted
 from tqdm import tqdm
 
 from config_default import config as cfg_default
-from config import config as cfg_user
+if Path("config.py").exists():
+    # noinspection PyPackageRequirements
+    from config import config as cfg_user
+else:
+    cfg_user = {}
 
 
 cfg = SimpleNamespace(**(cfg_default | cfg_user))
@@ -55,6 +59,7 @@ def write_on_image(image: np.ndarray, text: str, pos: [float, float], text_heigh
 # Main entry point
 def main():
     if not Path(cfg.shape_predictor).exists():
+        # TODO: Remove duplicate code from error handling.
         print(f"Face detector '{Path(cfg.shape_predictor).absolute()}' could not be found. "
               f"Make sure to download the file from the link in the README and place it in the same directory as "
               f"'main.py'.", file=sys.stderr)
@@ -122,7 +127,7 @@ def main():
         # Determine what to do if there are multiple faces
         if len(faces) > 1:
             if input_file in cfg.face_selection_override:
-                face = sorted(list(faces), key=cfg.face_selection_override[input_file])[0]
+                face = sorted(list(faces), key=cfg.face_selection_override[Path(input_file).stem])[0]
             else:
                 bb = [it.rect for it in faces]
                 bb = [((it.left(), it.top()), (it.right(), it.bottom())) for it in bb]
@@ -130,6 +135,7 @@ def main():
                     image_cv2 = cv2.rectangle(image_cv2, it[0], it[1], (255, 0, 0), 5)
                 cv2.imwrite(f"{cfg.output_error_dir}/{os.path.basename(input_file)}", image_cv2)
 
+                # TODO: Add an explanation of what to do here, and remove it from the README.
                 print(
                     f"Too many faces: Found {len(faces)} in '{input_file}'. "
                     f"See also file in '{cfg.output_error_dir}'.",

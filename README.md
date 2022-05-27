@@ -13,38 +13,29 @@ This script automatically scales, rotates, and crops all frames so that your eye
 ## How to use
 1. Put your images in the `input/` folder.
    Files will be processed in alphabetical order.
-2. Open a shell in the directory containing `main.py`.
-3. (_Required once_) Create a [venv](https://docs.python.org/3/tutorial/venv.html):
+2. (_Optional_) Configure the script by editing `config.py`.
+3. Open a shell in the directory containing `main.py`.
+4. (_Required once_) Create a [venv](https://docs.python.org/3/tutorial/venv.html):
    ```shell
    python3 -m venv venv/
    ```
-4. Activate the venv:
+5. Activate the venv:
    ```shell
    source venv/bin/activate
    ```
-5. (_Required once_) Install dependencies:
+6. (_Required once_) Install dependencies:
    ```shell
    python3 -m pip install -r requirements.txt
    ```
-6. Run the script:
+7. Run the script:
    ```shell
    python3 -m main
    ```
 
    If multiple faces are detected, the script will fail and the violating image will be stored in `output/error/`, with squares drawn around all detected faces.
-   Open the image and decide which face should be used.
-   Open `main.py` and add an override function for the image to `face_selection_override`.
-   The way this works is that the function is executed on all detected faces in that image, and the image with the lowest value will be used.
-   Consider the following examples of override functions:
-   ```python
-   face_selection_override = {
-       f"{input_dir}example_1.jpg": (lambda it: it.rect.top()),  # Selects the highest face
-       f"{input_dir}example_2.jpg": (lambda it: -it.rect.top()),  # Selects the lowest face
-       f"{input_dir}example_3.jpg": (lambda it: it.rect.left()),  # Selects the left-most face
-       f"{input_dir}example_4.jpg": (lambda it: -it.rect.left()),  # Selects the right-most face
-   }
-   ```
-7. Run FFmpeg on the `output/final/` folder to combine the created frames into a video.
+   You can manually select which face should be used by configuring the `face_selection_override` option in `config.py`, similar to the one in `config_default.py`.
+   The documentation in `config_default.py` explains the workings in more detail.
+8. Run FFmpeg on the `output/final/` folder to combine the created frames into a video.
    For example:
    ```shell
    cd output/final/
