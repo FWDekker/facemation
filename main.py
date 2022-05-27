@@ -4,12 +4,14 @@ import math
 import os
 import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import cv2
 import dlib
 import imutils
 import numpy as np
+from natsort import natsorted
 from tqdm import tqdm
 
 
@@ -21,28 +23,52 @@ output_dir = "output/"
 output_cache_dir = "output/cache/"
 output_error_dir = "output/error/"
 output_final_dir = "output/final/"
+# TODO: Move to a real temp dir
 output_temp_dir = "output/temp/"
+
+# TODO: Document these clearly in the README
+# TODO: Add `settings.py` which overrides these, from which the user can load settings, and add a `settings.default.py`
+filename_to_date = (lambda it: datetime.strptime(it if it.count("_") == 2 else it[:-4], "IMG_%Y%m%d_%H%M%S").date())
+date_to_caption = (lambda it: f"Day {(it - datetime(year=2021, month=12, day=23).date()).days}")
+shape_predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
 
 face_selection_override = {
     f"{input_dir}IMG_20220112_124422.jpg": (lambda it: it.rect.top()),
 }
 
-shape_predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
 
-
-# Helper function
+# Calculates hash of given file
 # Taken from https://stackoverflow.com/a/44873382
-def sha256sum(filename):
+def sha256sum(filename: str) -> str:
     h = hashlib.sha256()
     b = bytearray(128 * 1024)
     mv = memoryview(b)
     with open(filename, "rb", buffering=0) as f:
+        # noinspection PyUnresolvedReferences
         while n := f.readinto(mv):
             h.update(mv[:n])
     return h.hexdigest()
 
 
-if __name__ == "__main__":
+# Writes [text] on the image at [pos] (being coordinates in the range [0, 1]) with [text_height] as its height relative
+# to the image's height.
+def write_on_image(image: np.ndarray, text: str, pos: [float, float], text_height: float) -> np.ndarray:
+    height, width = image.shape[:2]
+    text_scale = cv2.getTextSize(text, fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=1, thickness=32)
+    text_scale = text_height / (text_scale[0][1] / height)
+    text_pos = (math.floor(pos[0] * width), math.floor(pos[1] * height))
+
+    image = cv2.putText(image, text, text_pos,
+                        fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=text_scale,
+                        color=(0, 0, 0), thickness=32, lineType=cv2.LINE_AA)
+    image = cv2.putText(image, text, text_pos,
+                        fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=text_scale,
+                        color=(255, 255, 255), thickness=16, lineType=cv2.LINE_AA)
+    return image
+
+
+# Main entry point
+def main():
     # Delete old files
     if Path(output_error_dir).exists():
         shutil.rmtree(output_error_dir)
@@ -65,9 +91,13 @@ if __name__ == "__main__":
         sys.exit(-1)
 
     # Pre-process
+    image_dates = {}
     eyes_left = {}
     eyes_right = {}
-    for idx, input_file in enumerate(tqdm(sorted(glob.glob(f"{input_dir}/*.jpg")), desc="Pre-processing")):
+    for idx, input_file in enumerate(tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")), desc="Pre-processing")):
+        # TODO: Error check the automatic conversion
+        image_dates[idx] = filename_to_date(Path(input_file).stem)
+
         image_hash = sha256sum(input_file)
         image_cache_file = Path(f"{output_cache_dir}/{image_hash}")
 
@@ -111,6 +141,7 @@ if __name__ == "__main__":
         # Store results
         eyes_left[input_file] = np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(42, 48)]), axis=0)
         eyes_right[input_file] = np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(36, 42)]), axis=0)
+        # noinspection PyTypeChecker
         np.savetxt(image_cache_file, np.vstack([eyes_left[input_file], eyes_right[input_file]]))
 
     # Calculate statistics
@@ -126,7 +157,7 @@ if __name__ == "__main__":
 
     # Translate, rotate, resize
     width_min, height_min = [1e99, 1e99]
-    for idx, input_file in enumerate(tqdm(sorted(glob.glob(f"{input_dir}/*.jpg")),
+    for idx, input_file in enumerate(tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")),
                                           desc="Translating, rotating, resizing")):
         image = cv2.imread(input_file)
 
@@ -145,8 +176,8 @@ if __name__ == "__main__":
         # Translate
         eyes_center = np.mean([eye_left, eye_right], axis=0)
         translation = [eyes_center_avg[0] - eyes_center[0], eyes_center_avg[1] - eyes_center[1]]
-        T = np.float32([[1, 0, translation[0]], [0, 1, translation[1]]])
-        image = cv2.warpAffine(image, T, (width, height))
+        transformation = np.float32([[1, 0, translation[0]], [0, 1, translation[1]]])
+        image = cv2.warpAffine(image, transformation, (width, height))
 
         # Rotate
         eye_right_relative = eye_right - eyes_center
@@ -168,11 +199,13 @@ if __name__ == "__main__":
     width_min = width_min if width_min % 2 == 0 else width_min - 1
     height_min = height_min if height_min % 2 == 0 else height_min - 1
 
-    # Reshape
-    for idx, input_file in enumerate(tqdm(sorted(glob.glob(f"{output_temp_dir}/*.jpg")), desc="Reshaping")):
+    # Crop and add text
+    for idx, input_file in enumerate(tqdm(natsorted(glob.glob(f"{output_temp_dir}/*.jpg")),
+                                          desc="Cropping and adding text")):
         image = cv2.imread(input_file)
         height, width = image.shape[:2]
 
+        # Crop
         width_excess = width - width_min
         width_start = int(width_excess / 2)
         width_end = width_start + width_min
@@ -182,4 +215,14 @@ if __name__ == "__main__":
         height_end = height_start + height_min
 
         image = image[height_start:height_end, width_start:width_end]
+
+        # Add text
+        caption = date_to_caption(image_dates[idx])
+        image = write_on_image(image, caption, (0.05, 0.95), 0.05)
+
+        # Write
         cv2.imwrite(f"{output_final_dir}/{idx}.jpg", image)
+
+
+if __name__ == "__main__":
+    main()
