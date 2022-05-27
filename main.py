@@ -4,9 +4,9 @@ import math
 import os
 import shutil
 import sys
-from datetime import datetime
 from pathlib import Path
 from traceback import print_exception
+from types import SimpleNamespace
 
 import cv2
 import dlib
@@ -15,27 +15,11 @@ import numpy as np
 from natsort import natsorted
 from tqdm import tqdm
 
+from config_default import config as cfg_default
+from config import config as cfg_user
 
-# Settings
-enable_debug = False  # Visualizes information in the output frames
 
-input_dir = "input/"
-output_dir = "output/"
-output_cache_dir = "output/cache/"
-output_error_dir = "output/error/"
-output_final_dir = "output/final/"
-# TODO: Move to a real temp dir
-output_temp_dir = "output/temp/"
-
-# TODO: Document these clearly in the README
-# TODO: Add `settings.py` which overrides these, from which the user can load settings, and add a `settings.default.py`
-filename_to_date = (lambda it: datetime.strptime(it if it.count("_") == 2 else it[:-4], "IMG_%Y%m%d_%H%M%S").date())
-date_to_caption = (lambda it: f"Day {(it - datetime(year=2021, month=12, day=23).date()).days}")
-shape_predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
-
-face_selection_override = {
-    f"{input_dir}IMG_20220112_124422.jpg": (lambda it: it.rect.top()),
-}
+cfg = SimpleNamespace(**(cfg_default | cfg_user))
 
 
 # Calculates hash of given file
@@ -70,24 +54,32 @@ def write_on_image(image: np.ndarray, text: str, pos: [float, float], text_heigh
 
 # Main entry point
 def main():
-    # Delete old files
-    if Path(output_error_dir).exists():
-        shutil.rmtree(output_error_dir)
-    if Path(output_final_dir).exists():
-        shutil.rmtree(output_final_dir)
-    if Path(output_temp_dir).exists():
-        shutil.rmtree(output_temp_dir)
+    if not Path(cfg.shape_predictor).exists():
+        print(f"Face detector '{Path(cfg.shape_predictor).absolute()}' could not be found. "
+              f"Make sure to download the file from the link in the README and place it in the same directory as "
+              f"'main.py'.", file=sys.stderr)
+        return -1
 
-    Path(input_dir).mkdir(exist_ok=True)
-    Path(output_dir).mkdir(exist_ok=True)
-    Path(output_cache_dir).mkdir(exist_ok=True)
-    Path(output_error_dir).mkdir(exist_ok=True)
-    Path(output_final_dir).mkdir(exist_ok=True)
-    Path(output_temp_dir).mkdir(exist_ok=True)
+    shape_predictor = dlib.shape_predictor(cfg.shape_predictor)
+
+    # Delete old files
+    if Path(cfg.output_error_dir).exists():
+        shutil.rmtree(cfg.output_error_dir)
+    if Path(cfg.output_final_dir).exists():
+        shutil.rmtree(cfg.output_final_dir)
+    if Path(cfg.output_temp_dir).exists():
+        shutil.rmtree(cfg.output_temp_dir)
+
+    Path(cfg.input_dir).mkdir(exist_ok=True)
+    Path(cfg.output_cache_dir).mkdir(exist_ok=True)
+    Path(cfg.output_error_dir).mkdir(exist_ok=True)
+    Path(cfg.output_final_dir).mkdir(exist_ok=True)
+    Path(cfg.output_temp_dir).mkdir(exist_ok=True)
 
     # Validation
-    if len(glob.glob(f"{input_dir}/*.jpg")) == 0:
-        print(f"No images detected in '{Path(input_dir).absolute()}'. Are you sure you put them in the right place?",
+    if len(glob.glob(f"{cfg.input_dir}/*.jpg")) == 0:
+        print(f"No images detected in '{Path(cfg.input_dir).absolute()}'. "
+              f"Are you sure you put them in the right place?",
               file=sys.stderr)
         return -1
 
@@ -96,10 +88,10 @@ def main():
     eyes_left = {}
     eyes_right = {}
 
-    pbar = tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")), desc="Pre-processing")
+    pbar = tqdm(natsorted(glob.glob(f"{cfg.input_dir}/*.jpg")), desc="Pre-processing")
     for idx, input_file in enumerate(pbar):
         try:
-            image_dates[idx] = filename_to_date(Path(input_file).stem)
+            image_dates[idx] = cfg.filename_to_date(Path(input_file).stem)
         except Exception as exception:
             pbar.close()
             print_exception(exception, file=sys.stderr)
@@ -107,7 +99,7 @@ def main():
             return -1
 
         image_hash = sha256sum(input_file)
-        image_cache_file = Path(f"{output_cache_dir}/{image_hash}")
+        image_cache_file = Path(f"{cfg.output_cache_dir}/{image_hash}")
 
         # Read from cache if applicable
         if image_cache_file.exists():
@@ -129,18 +121,18 @@ def main():
 
         # Determine what to do if there are multiple faces
         if len(faces) > 1:
-            if input_file in face_selection_override:
-                face = sorted(list(faces), key=face_selection_override[input_file])[0]
+            if input_file in cfg.face_selection_override:
+                face = sorted(list(faces), key=cfg.face_selection_override[input_file])[0]
             else:
                 bb = [it.rect for it in faces]
                 bb = [((it.left(), it.top()), (it.right(), it.bottom())) for it in bb]
                 for it in bb:
                     image_cv2 = cv2.rectangle(image_cv2, it[0], it[1], (255, 0, 0), 5)
-                cv2.imwrite(f"{output_error_dir}/{os.path.basename(input_file)}", image_cv2)
+                cv2.imwrite(f"{cfg.output_error_dir}/{os.path.basename(input_file)}", image_cv2)
 
                 print(
                     f"Too many faces: Found {len(faces)} in '{input_file}'. "
-                    f"See also file in '{output_error_dir}'.",
+                    f"See also file in '{cfg.output_error_dir}'.",
                     file=sys.stderr)
                 return -1
         else:
@@ -165,7 +157,7 @@ def main():
 
     # Translate, rotate, resize
     width_min, height_min = [1e99, 1e99]
-    for idx, input_file in enumerate(tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")),
+    for idx, input_file in enumerate(tqdm(natsorted(glob.glob(f"{cfg.input_dir}/*.jpg")),
                                           desc="Translating, rotating, resizing")):
         image = cv2.imread(input_file)
 
@@ -174,7 +166,7 @@ def main():
         eye_center = np.mean([eye_left, eye_right], axis=0)
 
         # Draw debug information
-        if enable_debug:
+        if cfg.enable_debug:
             image = cv2.circle(image, eye_left.astype(int), radius=20, color=(0, 255, 0), thickness=-1)
             image = cv2.circle(image, eye_right.astype(int), radius=20, color=(0, 255, 0), thickness=-1)
             image = cv2.circle(image, eyes_left_avg.astype(int), radius=20, color=(0, 0, 255), thickness=-1)
@@ -197,7 +189,7 @@ def main():
         image = cv2.resize(image, (int(width * scale), int(height * scale)))
 
         # Write
-        cv2.imwrite(f"{output_temp_dir}/{idx}.jpg", image)
+        cv2.imwrite(f"{cfg.output_temp_dir}/{idx}.jpg", image)
 
         # Store smallest image seen
         height_new, width_new = image.shape[:2]
@@ -208,7 +200,7 @@ def main():
     height_min = height_min if height_min % 2 == 0 else height_min - 1
 
     # Crop and add text
-    pbar = tqdm(natsorted(glob.glob(f"{output_temp_dir}/*.jpg")), desc="Cropping and adding text")
+    pbar = tqdm(natsorted(glob.glob(f"{cfg.output_temp_dir}/*.jpg")), desc="Cropping and adding text")
     for idx, input_file in enumerate(pbar):
         image = cv2.imread(input_file)
         height, width = image.shape[:2]
@@ -226,7 +218,7 @@ def main():
 
         # Add text
         try:
-            caption = date_to_caption(image_dates[idx])
+            caption = cfg.date_to_caption(image_dates[idx])
         except Exception as exception:
             pbar.close()
             print_exception(exception, file=sys.stderr)
@@ -236,7 +228,7 @@ def main():
         image = write_on_image(image, caption, (0.05, 0.95), 0.05)
 
         # Write
-        cv2.imwrite(f"{output_final_dir}/{idx}.jpg", image)
+        cv2.imwrite(f"{cfg.output_final_dir}/{idx}.jpg", image)
 
 
 if __name__ == "__main__":
