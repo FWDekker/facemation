@@ -39,6 +39,6 @@ This script automatically scales, rotates, and crops all frames so that your eye
    ffmpeg -f image2 -r 24 -i %d.jpg -vcodec libx264 -crf 24 out.mp4
    ```
    Tips:
-   * You can add `-vf "transpose=2"` to rotate.
+   * You can add `-vf "transpose=2"` before `out.mp4` to rotate.
      See also [this StackOverflow answer](https://stackoverflow.com/a/9570992).
-   * You can add `-vf "tpad=stop_mode=clone:stop_duration=3"` to freeze the last frame for 3 seconds.
+   * You can add `-vf "tpad=stop_mode=clone:stop_duration=3"` before `out.mp4` to freeze the last frame for 3 seconds.
