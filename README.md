@@ -5,8 +5,8 @@ This script automatically scales, rotates, and crops all frames so that your eye
 
 ## Requirements
 * Python 3.9 or newer
-* `venv` (e.g. `apt install python3-venv`)
-* `cmake` (e.g. `apt install cmake`) (required for `dlib` dependency)
+* [`venv`](https://docs.python.org/3/tutorial/venv.html) (e.g. `apt install python3-venv`)
+* [`cmake`](https://cmake.org/) (e.g. `apt install cmake`) (required for `dlib` dependency)
 * [FFmpeg](https://ffmpeg.org/) (e.g. `apt install ffmpeg`) (to demux frames into a video)
 * [shape_predictor_68_face_landmarks.dat](http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2) (in the same directory as `main.py`)
 
@@ -20,14 +20,15 @@ This script automatically scales, rotates, and crops all frames so that your eye
    ```
 4. Activate the venv:
    ```shell
-   source venv/bin/activate
+   .\venv\Scripts\activate  # Windows
+   source venv/bin/activate  # Linux
    ```
 5. (_Required once_) Install dependencies:
    ```shell
    python3 -m pip install -r requirements.txt
    ```
-6. (_Optional_) Configure the script using `config.py`.
-   Check `config_default.py` for more information in the configuration.
+6. (_Optional_) Configure the script by editing `config.py`.
+   Check `config_default.py` for more information.
 7. Run the script:
    ```shell
    python3 -m main
