@@ -43,3 +43,6 @@ This script automatically scales, rotates, and crops all frames so that your eye
    * You can add `-vf "transpose=2"` before `out.mp4` to rotate.
      See also [this StackOverflow answer](https://stackoverflow.com/a/9570992).
    * You can add `-vf "tpad=stop_mode=clone:stop_duration=3"` before `out.mp4` to freeze the last frame for 3 seconds.
+   * You can add `-vf "minterpolate=fps=96:mi_mode=blend" ` before `out.mp4` to morph frames to make it look smoother,
+     where `fps=96` changes the FPS to 96.
+   * If you have two filters `-vf="filter1"` and `-vf="filter2"`, combine them as `-vf="filter1, filter2"`.

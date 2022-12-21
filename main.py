@@ -129,7 +129,7 @@ def main() -> int:
 
         # Determine what to do if there are multiple faces
         if len(faces) > 1:
-            if input_file in cfg.face_selection_override:
+            if Path(input_file).stem in cfg.face_selection_override:
                 face = sorted(list(faces), key=cfg.face_selection_override[Path(input_file).stem])[0]
             else:
                 bb = [it.rect for it in faces]
