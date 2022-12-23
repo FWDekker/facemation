@@ -53,5 +53,25 @@ config = {
         # Selects the face whose left edge is closest to the right of the image.
         f"example_left_right": (lambda it: -it.rect.left()),
         # Selects the face whose top edge is closest to y = 500.
-        f"example_top_500": (lambda it: abs(it.rect.top() - 500))}
+        f"example_top_500": (lambda it: abs(it.rect.top() - 500))},
+
+    # Set to `True` to automatically run FFmpeg at the end. Requires that FFmpeg is installed on your machine.
+    "ffmpeg_enabled": True,
+    # The filename to save the output video under in the `output/final/` directory.
+    "ffmpeg_output_filename": "result.mp4",
+    # The number of photos per second to show in the output video.
+    "ffmpeg_fps": "12",
+    # The codec to use for the output video. x264 is a very widely supported codec.
+    "ffmpeg_codec": "libx264",
+    # The "compression level" of the output video. A lower value means higher quality. Recommended between 18 and 28.
+    "ffmpeg_crf": "23",
+    # The video filters to apply when creating the output video.
+    "ffmpeg_video_filters": [
+        # Pauses the first frame for 1 second at the start.
+        "tpad=start_mode=clone:start_duration=1",
+        # Pauses the last frame for 3 seconds at the end.
+        "tpad=stop_mode=clone:stop_duration=3",
+        # Morphs pictures into each other for a smoother transition effect.
+        "minterpolate=fps=30:mi_mode=blend",
+    ],
 }

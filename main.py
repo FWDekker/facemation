@@ -3,6 +3,7 @@ import hashlib
 import math
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -242,6 +243,24 @@ def main() -> int:
 
         # Write
         cv2.imwrite(f"{cfg.output_final_dir}/{idx}.jpg", image)
+
+    # Demux with FFmpeg
+    if cfg.ffmpeg_enabled:
+        pbar = tqdm(total=1, desc="Creating video from images with FFmpeg")
+        subprocess.run([
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel", "error",
+            "-f", "image2",
+            "-r", cfg.ffmpeg_fps,
+            "-i", "%d.jpg",
+            "-vcodec", cfg.ffmpeg_codec,
+            "-crf", cfg.ffmpeg_crf,
+            "-vf", ",".join(cfg.ffmpeg_video_filters),
+            cfg.ffmpeg_output_filename
+        ], cwd="output/final/")
+        pbar.update(1)
+        pbar.close()
 
 
 if __name__ == "__main__":

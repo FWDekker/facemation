@@ -20,15 +20,17 @@ This script automatically scales, rotates, and crops all frames so that your eye
    ```
 4. Activate the venv:
    ```shell
-   .\venv\Scripts\activate  # Windows
-   source venv/bin/activate  # Linux
+   # Windows
+   .\venv\Scripts\activate
+   # Linux
+   source venv/bin/activate
    ```
 5. (_Required once_) Install dependencies:
    ```shell
    python3 -m pip install -r requirements.txt
    ```
-6. (_Optional_) Configure the script by editing `config.py`.
-   Check `config_default.py` for more information.
+6. (_Optional_) Copy `config_default.py` to `config.py`, and adjust settings as desired.
+   Settings are loaded from `config_default.py` and then overwritten by `config.py`.
 7. Run the script:
    ```shell
    python3 -m main
@@ -37,11 +39,9 @@ This script automatically scales, rotates, and crops all frames so that your eye
    For example:
    ```shell
    cd output/final/
-   ffmpeg -f image2 -r 24 -i %d.jpg -vcodec libx264 -crf 24 out.mp4
+   ffmpeg -f image2 -r 24 -i %d.jpg -vcodec libx264 -crf 23 out.mp4
    ```
    Tips:
-   * You can add `-vf "transpose=2"` before `out.mp4` to rotate.
-     See also [this StackOverflow answer](https://stackoverflow.com/a/9570992).
    * You can add `-vf "tpad=stop_mode=clone:stop_duration=3"` before `out.mp4` to freeze the last frame for 3 seconds.
    * You can add `-vf "minterpolate=fps=96:mi_mode=blend" ` before `out.mp4` to morph frames to make it look smoother,
      where `fps=96` changes the FPS to 96.
