@@ -35,14 +35,3 @@ This script automatically scales, rotates, and crops all frames so that your eye
    ```shell
    python3 -m main
    ```
-8. Run FFmpeg on the `output/final/` folder to combine the created frames into a video.
-   For example:
-   ```shell
-   cd output/final/
-   ffmpeg -f image2 -r 24 -i %d.jpg -vcodec libx264 -crf 23 out.mp4
-   ```
-   Tips:
-   * You can add `-vf "tpad=stop_mode=clone:stop_duration=3"` before `out.mp4` to freeze the last frame for 3 seconds.
-   * You can add `-vf "minterpolate=fps=96:mi_mode=blend" ` before `out.mp4` to morph frames to make it look smoother,
-     where `fps=96` changes the FPS to 96.
-   * If you have two filters `-vf="filter1"` and `-vf="filter2"`, combine them as `-vf="filter1, filter2"`.

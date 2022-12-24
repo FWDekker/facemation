@@ -8,24 +8,25 @@ from datetime import datetime
 config = {
     # Set to `True` to visualize debug information in the output.
     "enable_debug": False,
-    # Set to `True` to store pre-processed information on disk to speed up future runs. Stored information is associated
-    # with a hash of the image so that renaming the file does not cause the information to be lost.
-    "enable_caching": True,
     # Predictor to use for finding facial features. You probably don't need to change this.
     "shape_predictor": "shape_predictor_68_face_landmarks.dat",
 
     # (Relative) directory to find the original frames in.
     "input_dir": "input/",
-    # (Relative) directory to cache facial features in.
-    "output_cache_dir": "output/cache/",
     # (Relative) directory to store images in that caused an error.
-    "output_error_dir": "output/error/",
-    # (Relative) directory to store the final processed images in.
-    "output_final_dir": "output/final/",
+    "output_error_dir": "output/0-error/",
+    # (Relative) directory to cache locations of found faces in.
+    "output_faces_dir": "output/1-faces/",
+    # (Relative) directory to store normalized images in.
+    "output_normalized_dir": "output/2-normalized/",
+    # (Relative) directory to store cropped images in.
+    "output_cropped_dir": "output/3-cropped/",
+    # (Relative) directory to store captioned images in.
+    "output_captioned_dir": "output/4-captioned/",
 
     # Converts the filename of an image to the date on which it was taken.
     # See also https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes
-    "filename_to_date": (lambda it: datetime.strptime("IMG_%Y%m%d_%H%M%S", it).date()),
+    "filename_to_date": (lambda it: datetime.strptime("IMG_%Y%m%d_%H%M%S.jpg", it).date()),
     # Converts the date of an image to an appropriate caption.
     "date_to_caption": (lambda it: it.strftime("%Y-%m-%d")),
     # Determines which face should be used for normalization if an image contains multiple faces.
@@ -57,8 +58,8 @@ config = {
 
     # Set to `True` to automatically run FFmpeg at the end. Requires that FFmpeg is installed on your machine.
     "ffmpeg_enabled": True,
-    # The filename to save the output video under in the `output/final/` directory.
-    "ffmpeg_output_filename": "result.mp4",
+    # The filename to save the created video as relative to `input_dir`.
+    "ffmpeg_output_path": "../facemation.mp4",
     # The number of photos per second to show in the output video.
     "ffmpeg_fps": "12",
     # The codec to use for the output video. x264 is a very widely supported codec.
