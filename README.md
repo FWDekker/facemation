@@ -1,7 +1,8 @@
 # Facemation
 Turn your daily selfies into a good-looking timelapse.
 
-This script automatically scales, rotates, and crops all frames so that your eyes are aligned in each photo.
+This script automatically scales, rotates, crops, and captions all frames so your eyes are aligned in each photo, and
+compiles these frames into a timelapse.
 
 ## Requirements
 * Python 3.9 or newer
@@ -12,7 +13,7 @@ This script automatically scales, rotates, and crops all frames so that your eye
 
 ## How to use
 1. Put your images in the `input/` folder.
-   Files will be processed in alphabetical order.
+   Files are processed in [natural sort order](https://en.wikipedia.org/wiki/Natural_sort_order).
 2. Open a shell in the directory containing `main.py`.
 3. (_Required once_) Create a [venv](https://docs.python.org/3/tutorial/venv.html):
    ```shell
@@ -35,3 +36,5 @@ This script automatically scales, rotates, and crops all frames so that your eye
    ```shell
    python3 -m main
    ```
+8. Check the output and adjust the configuration as desired.
+   All intermediate results are heavily cached, so subsequent runs are much faster.

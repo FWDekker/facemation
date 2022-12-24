@@ -6,29 +6,26 @@ from datetime import datetime
 
 
 config = {
-    # Set to `True` to visualize debug information in the output.
-    "enable_debug": False,
     # Predictor to use for finding facial features. You probably don't need to change this.
     "shape_predictor": "shape_predictor_68_face_landmarks.dat",
 
     # (Relative) directory to find the original frames in.
     "input_dir": "input/",
     # (Relative) directory to store images in that caused an error.
-    "output_error_dir": "output/0-error/",
-    # (Relative) directory to cache locations of found faces in.
-    "output_faces_dir": "output/1-faces/",
-    # (Relative) directory to store normalized images in.
-    "output_normalized_dir": "output/2-normalized/",
-    # (Relative) directory to store cropped images in.
-    "output_cropped_dir": "output/3-cropped/",
-    # (Relative) directory to store captioned images in.
-    "output_captioned_dir": "output/4-captioned/",
+    "error_dir": "output/error/",
+    # (Relative) directory to cache intermediate results in.
+    "cache_dir": "output/cache/",
+    # (Relative) directory to store final frames in.
+    "frames_dir": "output/frames/",
+    # (Relative) directory to store created video in, relative to `output_frames_dir`.
+    "output_path": "../facemation.mp4",
 
     # Converts the filename of an image to the date on which it was taken.
     # See also https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes
     "filename_to_date": (lambda it: datetime.strptime("IMG_%Y%m%d_%H%M%S.jpg", it).date()),
     # Converts the date of an image to an appropriate caption.
     "date_to_caption": (lambda it: it.strftime("%Y-%m-%d")),
+
     # Determines which face should be used for normalization if an image contains multiple faces.
     #
     # Add an entry for each image that contains multiple faces. The entry maps the filename of the image (without
@@ -56,10 +53,11 @@ config = {
         # Selects the face whose top edge is closest to y = 500.
         f"example_top_500": (lambda it: abs(it.rect.top() - 500))},
 
-    # Set to `True` to automatically run FFmpeg at the end. Requires that FFmpeg is installed on your machine.
+    # Set to `True` to visualize debug information in the output.
+    "normalize_draw_debug": False,
+
+    # Set to `True` to automatically run FFmpeg at the end.
     "ffmpeg_enabled": True,
-    # The filename to save the created video as relative to `input_dir`.
-    "ffmpeg_output_path": "../facemation.mp4",
     # The number of photos per second to show in the output video.
     "ffmpeg_fps": "12",
     # The codec to use for the output video. x264 is a very widely supported codec.
