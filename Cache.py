@@ -40,7 +40,18 @@ class Cache(ABC, Generic[T]):
         :param args: the args to search for
         :return: `True` if and only if a file with [key] and [args] has been stored.
         """
-        return Path(self._get_path(key, args)).exists()
+        return Path(self.get_path(key, args)).exists()
+
+    def has_any(self, key: str) -> bool:
+        """
+        Returns `True` if and only if any data with [key] and any args has been cached.
+
+        :param key: the key to search for
+        :return: `True` if and only if any data with [key] and any args has been cached
+        """
+
+        paths = glob.glob(self.get_glob(key))
+        return len(paths) > 0
 
     def load(self, key: str, args: List[str]) -> T:
         """
@@ -51,7 +62,7 @@ class Cache(ABC, Generic[T]):
         :return: the cached data associated with [key] and [args]
         """
 
-        path = self._get_path(key, args)
+        path = self.get_path(key, args)
 
         if not Path(path).exists():
             raise Exception(f"Tried to load '{path}' from cache '{self.prefix}', but no such file exists.")
@@ -62,19 +73,17 @@ class Cache(ABC, Generic[T]):
         """
         Returns any cached data associated with [key], regardless of `args`.
 
+        Throws an [Exception] if no data has been cached under [key].
+
         :param key: the key to load data for
         :return: any cached data associated with [key], regardless of `args`
         """
 
-        paths = glob.glob(self._get_glob(key))
-        if len(paths) != 1:
-            raise Exception(f"Expected exactly 1 cached result for '{self.prefix}', but found {len(paths)}.")
-
-        return self._read_data(paths[0])
+        return self._read_data(self.get_path_any(key))
 
     def cache(self, key: str, args: List[str], data: T) -> None:
         """
-        Caches [data] under [key] and [args].
+        Caches [data] under [key] and [args], and removes all other data cached under [key].
 
         :param key: the key to cache [data] under
         :param args: the args to cache [data] under
@@ -82,13 +91,13 @@ class Cache(ABC, Generic[T]):
         :return: `None`
         """
 
-        for file in glob.glob(self._get_glob(key)):
+        for file in glob.glob(self.get_glob(key)):
             Path(file).unlink()
 
-        path = self._get_path(key, args)
+        path = self.get_path(key, args)
         self._write_data(path, data)
 
-    def _get_path(self, key: str, args: List[str]) -> str:
+    def get_path(self, key: str, args: List[str]) -> str:
         """
         Returns the path to the data cached under [key] and [args].
 
@@ -103,7 +112,23 @@ class Cache(ABC, Generic[T]):
         path += self.suffix
         return path
 
-    def _get_glob(self, key: str) -> str:
+    def get_path_any(self, key: str) -> str:
+        """
+        Returns the path to any data cached under [key] and any args.
+
+        Throws an [Exception] if no data has been cached under [key].
+
+        :param key: the key to search for
+        :return: the path to any data cached under [key] and any args
+        """
+
+        paths = glob.glob(self.get_glob(key))
+        if len(paths) == 0:
+            raise Exception(f"Expected exactly 1 cached result for '{self.prefix}', but found 0.")
+
+        return paths[0]
+
+    def get_glob(self, key: str) -> str:
         """
         Returns the glob pattern that matches all data cached under [key].
 

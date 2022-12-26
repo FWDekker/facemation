@@ -50,9 +50,9 @@ def find_faces(input_dir: str,
     cache = NdarrayCache(cache_dir, "face", ".cache")
     detector = dlib.get_frontal_face_detector()
 
-    pbar = tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")), desc="Detecting faces", file=sys.stdout)
-    for idx, image_path in enumerate(pbar):
+    for image_path in tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")), desc="Detecting faces", file=sys.stdout):
         image_name = os.path.basename(image_path)
+        # TODO: Cache hashes (= use as inputs to this function?) so they are not recalculated each step
         image_hash = sha256sum(image_path)
 
         # Read from cache if exists
@@ -120,7 +120,7 @@ def normalize_images(input_dir: str,
 
     width_min, height_min = [1e99, 1e99]
 
-    cache = ImageCache(cache_dir, "normalized", ".jpg")
+    normalized_cache = ImageCache(cache_dir, "normalized", ".jpg")
 
     # Determine eye position targets
     eyes_dist = {it: math.dist(eyes_left[it], eyes_right[it]) for it in eyes_left.keys()}
@@ -135,7 +135,7 @@ def normalize_images(input_dir: str,
 
     # Translate, rotate, resize
     pbar = tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")), desc="Translating, rotating, resizing", file=sys.stdout)
-    for idx, image_path in enumerate(pbar):
+    for image_path in pbar:
         image_name = os.path.basename(image_path)
         image_hash = sha256sum(image_path)
 
@@ -144,8 +144,8 @@ def normalize_images(input_dir: str,
         eye_hash = sha256sums(np.array2string(eye_both))
 
         # Read from cache if exists
-        if cache.has(image_hash, [eye_hash]):
-            image = cache.load(image_hash, [eye_hash])
+        if normalized_cache.has(image_hash, [eye_hash]):
+            image = normalized_cache.load(image_hash, [eye_hash])
         else:
             # Read image
             image = cv2.imread(image_path)
@@ -160,6 +160,7 @@ def normalize_images(input_dir: str,
                 image = cv2.circle(image, eyes_right_avg.astype(int), radius=20, color=(0, 0, 255), thickness=-1)
                 image = cv2.circle(image, eye_center.astype(int), radius=20, color=(255, 0, 0), thickness=-1)
 
+            # TODO: Prevent black bars on top/left after translating
             # Translate
             eyes_center = np.mean([eye_left, eye_right], axis=0)
             translation = [eyes_center_avg[0] - eyes_center[0], eyes_center_avg[1] - eyes_center[1]]
@@ -176,7 +177,7 @@ def normalize_images(input_dir: str,
             image = cv2.resize(image, (int(width * scale), int(height * scale)))
 
             # Store normalized image
-            cache.cache(image_hash, [eye_hash], image)
+            normalized_cache.cache(image_hash, [eye_hash], image)
 
         # Store smallest image seen
         height_new, width_new = image.shape[:2]
@@ -203,8 +204,7 @@ def crop_images(input_dir: str, cache_dir: str, cropped_width: int, cropped_heig
     normalized_cache = ImageCache(cache_dir, "normalized", ".jpg")
     cropped_cache = ImageCache(cache_dir, "cropped", ".jpg")
 
-    pbar = tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")), desc="Cropping", file=sys.stdout)
-    for idx, image_path in enumerate(pbar):
+    for image_path in tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")), desc="Cropping", file=sys.stdout):
         image_hash = sha256sum(image_path)
         cropped_size_hash = sha256sums(np.array2string(np.array([cropped_width, cropped_height])))
 
@@ -245,10 +245,11 @@ def add_captions(input_dir: str, cache_dir: str, filename_to_date: Callable[[str
     captioned_cache = ImageCache(cache_dir, "captioned", ".jpg")
 
     pbar = tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")), desc="Adding captions", file=sys.stdout)
-    for idx, image_path in enumerate(pbar):
+    for image_path in pbar:
         image_name = os.path.basename(image_path)
 
         try:
+            # TODO: Define `caption` as single function with access to all image metadata
             caption = date_to_caption(filename_to_date(image_name))
         except Exception as exception:
             pbar.close()
@@ -286,7 +287,14 @@ def demux_images(enabled: bool, input_dir: str, cache_dir: str, frames_dir: str,
     """
 
     if enabled:
-        # TODO: Symlink to captioned files!
+        captioned_cache = ImageCache(cache_dir, "captioned", ".jpg")
+
+        pbar = tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")), desc="Selecting frames", file=sys.stdout)
+        for idx, image_path in enumerate(pbar):
+            image_hash = sha256sum(image_path)
+            captioned_path = captioned_cache.get_path_any(image_hash)
+            os.symlink(Path(captioned_path).absolute(), f"{frames_dir}/{idx}.jpg")
+
         print("Demuxing into video:")
         try:
             subprocess.run([
@@ -302,7 +310,7 @@ def demux_images(enabled: bool, input_dir: str, cache_dir: str, frames_dir: str,
                 "-crf", crf,
                 "-vf", ",".join(video_filters),
                 output_path
-            ], cwd=input_dir, stderr=sys.stdout, check=True)
+            ], cwd=frames_dir, stderr=sys.stdout, check=True)
         except Exception as exception:
             raise UserException("FFmpeg failed to create a video. "
                                 "Read the messages above for more information.", exception) from None
