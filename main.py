@@ -234,16 +234,18 @@ def add_captions(imgs: Dict[str, MetaData],
 
     pbar = tqdm(imgs.items(), desc="Adding captions", file=sys.stdout)
     for img_path, img_data in pbar:
+        img_name = os.path.basename(img_path)
+
         try:
             # TODO: Define `caption` as single function with access to all image metadata
-            caption = date_to_caption(filename_to_date(os.path.basename(img_path)))
+            caption = date_to_caption(filename_to_date(img_name))
         except Exception as exception:
             pbar.close()
-            # TODO: Clarify which image caused exception
-            raise UserException("Failed to convert date to caption. "
-                                "Your 'filename_to_date' has been configured wrongly. "
-                                "Check your configuration for more details.", exception) from None
+            raise UserException(f"Failed to convert date to caption for image '{img_name}'. "
+                                f"Your 'filename_to_date' has been configured wrongly. "
+                                f"Check your configuration for more details.", exception) from None
 
+        # TODO: Base cache key on hash of previous image
         caption_hash = sha256sums(caption)
         if captioned_cache.has(img_data["hash"], [caption_hash]):
             continue
@@ -284,7 +286,7 @@ def demux_images(enabled: bool,
         pbar = tqdm(natsorted(imgs.keys()), desc="Selecting frames", file=sys.stdout)
         for idx, image_path in enumerate(pbar):
             captioned_path = input_cache.get_path_any(imgs[image_path]["hash"])
-            os.symlink(Path(captioned_path).absolute(), f"{frames_dir}/{idx}.jpg")
+            os.symlink(os.path.relpath(captioned_path, frames_dir), f"{frames_dir}/{idx}.jpg")
 
         print("Demuxing into video:")
         try:

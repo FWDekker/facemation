@@ -29,7 +29,7 @@ config = {
     # Determines which face should be used for normalization if an image contains multiple faces.
     #
     # Add an entry for each image that contains multiple faces. The entry maps the filename of the image (without
-    # directory or extension) to a function that returns a number. Specifically, the function takes an instance of
+    # directory, with extension) to a function that returns a number. Specifically, the function takes an instance of
     # `dlib.full_object_detection` (see also http://dlib.net/python/index.html#dlib_pybind11.full_object_detection), and
     # returns an `int`. When the given file is processed, this function is executed on each face in that image, and the
     # face with the lowest value will be used for all subsequent processing.
