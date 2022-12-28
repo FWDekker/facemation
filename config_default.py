@@ -53,9 +53,6 @@ config = {
         # Selects the face whose top edge is closest to y = 500.
         f"example_top_500": (lambda it: abs(it.rect.top() - 500))},
 
-    # Set to `True` to visualize debug information in the output.
-    "normalize_draw_debug": False,
-
     # Set to `True` to automatically run FFmpeg at the end.
     "ffmpeg_enabled": True,
     # The number of photos per second to show in the output video.

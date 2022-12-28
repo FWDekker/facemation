@@ -6,11 +6,10 @@ import subprocess
 import sys
 from datetime import date
 from pathlib import Path
-from typing import Callable, Dict, Tuple
+from typing import Callable, Dict, Tuple, TypedDict
 
 import cv2
 import dlib
-import imutils
 import numpy as np
 from natsort import natsorted
 from tqdm import tqdm
@@ -19,73 +18,97 @@ from Cache import ImageCache, NdarrayCache
 from ConfigHelper import load_config
 from HashHelper import sha256sum, sha256sums
 from ImageHelper import write_on_image
+from MathHelper import rotate, get_corners, largest_inner_rectangle, rectangle_overlap
 from UserException import UserException
 
+Coords = np.ndarray  # x, y
+Dimensions = np.ndarray  # width, height
+MetaData = TypedDict("MetaData", {"hash": str, "dims": Dimensions})
 
-def find_faces(input_dir: str,
-               cache_dir: str,
+
+def read_image_data(input_dir: str) -> Dict[str, MetaData]:
+    """
+    Reads image meta-data, such as filesize and image contents hash.
+
+    :param input_dir: the directory to read input files from
+    :return: a mapping from input images to the hash of the image and the dimensions of the image
+    """
+
+    image_data = {}
+
+    pbar = tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")), desc="Reading image meta-data", file=sys.stdout)
+    for image_path in pbar:
+        image_hash = sha256sum(image_path)
+
+        image = cv2.imread(image_path)
+        height, width = image.shape[:2]
+
+        image_data[image_path] = {"hash": image_hash, "dims": np.array([width, height])}
+
+    return image_data
+
+
+def find_faces(img_data: Dict[str, MetaData],
+               face_cache: NdarrayCache,
                error_dir: str,
                face_selection_override: Dict[str, Callable[[dlib.full_object_detection], int]],
-               shape_predictor: dlib.shape_predictor) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
+               shape_predictor: dlib.shape_predictor) -> Tuple[Dict[str, Coords], Dict[str, Coords]]:
     """
-    Finds one face in each image in [input_dir], with each face expressed as the positions of the eyes.
-
-    In addition to returning the eye coordinates, this function also caches results in [cache_dir], which significantly
-    speeds up the process.
+    Finds one face in each image in [img_data], with each face expressed as the positions of the eyes, caching the face
+    data in [face_cache], and returning the found eye positions.
 
     Raises a [UserException] if no or multiple faces are found in an image. Additionally, if multiple faces are found,
     the image is written to [error_dir] with debugging information.
 
-    :param input_dir: the directory with original input images
-    :param cache_dir: the directory to cache found faces in
+    :param img_data: the metadata of the images to detect faces in
+    :param face_cache: the cache to store found faces in
     :param error_dir: the directory to write debugging information in to assist the user
     :param shape_predictor: a function that extracts faces from an image
     :param face_selection_override: selects the index of the face to return if multiple faces are found
-    :return: a mapping from filenames to left eye positions, and a mapping from filenames to right eye positions
+    :return: a mapping from keys in [img_data] to left eye positions, and a mapping from keys in [img_data] to right eye
+    positions; note that "left eye" refers to the eye on the left in the image, rather than the person's anatomical left
+    eye
     """
 
-    eyes_left = {}
-    eyes_right = {}
+    left_eyes = {}
+    right_eyes = {}
 
-    cache = NdarrayCache(cache_dir, "face", ".cache")
     detector = dlib.get_frontal_face_detector()
 
-    for image_path in tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")), desc="Detecting faces", file=sys.stdout):
-        image_name = os.path.basename(image_path)
-        # TODO: Cache hashes (= use as inputs to this function?) so they are not recalculated each step
-        image_hash = sha256sum(image_path)
-
+    for img_path, img_data in tqdm(img_data.items(), desc="Detecting faces", file=sys.stdout):
         # Read from cache if exists
-        if cache.has(image_hash, []):
-            eyes_both = cache.load(image_hash, [])
-            eyes_left[image_name] = eyes_both[0]
-            eyes_right[image_name] = eyes_both[1]
+        if face_cache.has(img_data["hash"], []):
+            eyes_both = face_cache.load(img_data["hash"], [])
+            left_eyes[img_path] = eyes_both[0]
+            right_eyes[img_path] = eyes_both[1]
             continue
 
         # Detect eyes
-        image = cv2.imread(image_path)
-        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        img = cv2.imread(img_path)
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        detections = detector(image_rgb, 1)
+        detections = detector(img_rgb, 1)
 
         faces = dlib.full_object_detections()
         for detection in detections:
-            faces.append(shape_predictor(image_rgb, detection))
+            faces.append(shape_predictor(img_rgb, detection))
 
         # Determine what to do if there are multiple faces
         if len(faces) == 0:
-            raise UserException(f"Not enough faces: Found 0 faces in '{image_path}'.")
+            raise UserException(f"Not enough faces: Found 0 faces in '{img_path}'.")
         elif len(faces) > 1:
-            if image_name in face_selection_override:
-                face = sorted(list(faces), key=face_selection_override[image_name])[0]
+            img_name = os.path.basename(img_path)  # Includes file extension
+
+            if img_name in face_selection_override:
+                face = sorted(list(faces), key=face_selection_override[img_name])[0]
             else:
                 bb = [it.rect for it in faces]
                 bb = [((it.left(), it.top()), (it.right(), it.bottom())) for it in bb]
                 for it in bb:
-                    image = cv2.rectangle(image, it[0], it[1], (255, 0, 0), 5)
-                cv2.imwrite(f"{error_dir}/{image_name}", image)
+                    img = cv2.rectangle(img, it[0], it[1], (255, 0, 0), 5)
+                cv2.imwrite(f"{error_dir}/{img_name}", img)
 
-                raise UserException(f"Too many faces: Found {len(faces)} in '{image_path}'. "
+                raise UserException(f"Too many faces: Found {len(faces)} in '{img_path}'. "
                                     f"The image has been stored in '{Path(error_dir).absolute()}' with squares drawn "
                                     f"around all faces that were found. "
                                     f"You can select which face should be used by adjusting the "
@@ -95,189 +118,152 @@ def find_faces(input_dir: str,
             face = faces[0]
 
         # Store results
-        eyes_left[image_name] = np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(42, 48)]), axis=0)
-        eyes_right[image_name] = np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(36, 42)]), axis=0)
-        cache.cache(image_hash, [], np.vstack([eyes_left[image_name], eyes_right[image_name]]))
+        left_eyes[img_path] = np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(36, 42)]), axis=0)
+        right_eyes[img_path] = np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(42, 48)]), axis=0)
+        face_cache.cache(img_data["hash"], [], np.vstack([left_eyes[img_path], right_eyes[img_path]]))
 
-    return eyes_left, eyes_right
+    return left_eyes, right_eyes
 
 
-def normalize_images(input_dir: str,
-                     cache_dir: str,
-                     draw_debug: bool,
-                     eyes_left: Dict[str, np.ndarray],
-                     eyes_right: Dict[str, np.ndarray]) -> Tuple[int, int]:
+def normalize_images(img_data: Dict[str, MetaData],
+                     normalized_cache: ImageCache,
+                     left_eyes: Dict[str, Coords],
+                     right_eyes: Dict[str, Coords]) -> None:
     """
-    Translates, rotates, and resizes each file in [input_dir], storing the results in [cache_dir].
+    Translates, rotates, and resizes each file in [img_data], storing the results in [normalized_cache].
 
-    :param input_dir: the directory with original input images
-    :param cache_dir: the directory to cache normalized images in
-    :param draw_debug: `True` if eyes should be drawn in all images in [cache_dir]
-    :param eyes_left: a mapping from filenames in [input_dir] to left eye positions
-    :param eyes_right: a mapping from filenames in [input_dir] to right eye positions
-    :return: the smallest width and smallest height observed in all images
-    """
-
-    width_min, height_min = [1e99, 1e99]
-
-    normalized_cache = ImageCache(cache_dir, "normalized", ".jpg")
-
-    # Determine eye position targets
-    eyes_dist = {it: math.dist(eyes_left[it], eyes_right[it]) for it in eyes_left.keys()}
-    eyes_dist_avg = np.mean(np.array(list(eyes_dist.values())))
-
-    eyes_left_np = np.array(list(eyes_left.values()))
-    eyes_right_np = np.array(list(eyes_right.values()))
-
-    eyes_left_avg = np.mean(eyes_left_np, axis=0)
-    eyes_right_avg = np.mean(eyes_right_np, axis=0)
-    eyes_center_avg = np.mean([eyes_left_avg, eyes_right_avg], axis=0)
-
-    # Translate, rotate, resize
-    pbar = tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")), desc="Translating, rotating, resizing", file=sys.stdout)
-    for image_path in pbar:
-        image_name = os.path.basename(image_path)
-        image_hash = sha256sum(image_path)
-
-        eye_left, eye_right = eyes_left[image_name], eyes_right[image_name]
-        eye_both = np.vstack([eyes_left[image_name], eyes_right[image_name]])
-        eye_hash = sha256sums(np.array2string(eye_both))
-
-        # Read from cache if exists
-        if normalized_cache.has(image_hash, [eye_hash]):
-            image = normalized_cache.load(image_hash, [eye_hash])
-        else:
-            # Read image
-            image = cv2.imread(image_path)
-            height, width = image.shape[:2]
-            eye_center = np.mean([eye_left, eye_right], axis=0)
-
-            # Draw debug information
-            if draw_debug:
-                image = cv2.circle(image, eye_left.astype(int), radius=20, color=(0, 255, 0), thickness=-1)
-                image = cv2.circle(image, eye_right.astype(int), radius=20, color=(0, 255, 0), thickness=-1)
-                image = cv2.circle(image, eyes_left_avg.astype(int), radius=20, color=(0, 0, 255), thickness=-1)
-                image = cv2.circle(image, eyes_right_avg.astype(int), radius=20, color=(0, 0, 255), thickness=-1)
-                image = cv2.circle(image, eye_center.astype(int), radius=20, color=(255, 0, 0), thickness=-1)
-
-            # TODO: Prevent black bars on top/left after translating
-            # Translate
-            eyes_center = np.mean([eye_left, eye_right], axis=0)
-            translation = [eyes_center_avg[0] - eyes_center[0], eyes_center_avg[1] - eyes_center[1]]
-            transformation = np.float32([[1, 0, translation[0]], [0, 1, translation[1]]])
-            image = cv2.warpAffine(image, transformation, (width, height))
-
-            # Rotate
-            eye_right_relative = eye_right - eyes_center
-            angle = math.atan(eye_right_relative[1] / eye_right_relative[0])
-            image = imutils.rotate(image, angle)
-
-            # Resize
-            scale = eyes_dist_avg / eyes_dist[image_name]
-            image = cv2.resize(image, (int(width * scale), int(height * scale)))
-
-            # Store normalized image
-            normalized_cache.cache(image_hash, [eye_hash], image)
-
-        # Store smallest image seen
-        height_new, width_new = image.shape[:2]
-        width_min, height_min = min(width_min, width_new), min(height_min, height_new)
-
-    # Make dimensions even
-    width_min = width_min if width_min % 2 == 0 else width_min - 1
-    height_min = height_min if height_min % 2 == 0 else height_min - 1
-
-    return width_min, height_min
-
-
-def crop_images(input_dir: str, cache_dir: str, cropped_width: int, cropped_height: int) -> None:
-    """
-    Crops each image in [input_dir] to be [width] by [height] pixels.
-
-    :param input_dir: the directory with original input images
-    :param cache_dir: the directory to read normalized images from and cache cropped images in
-    :param cropped_width: the width that each image should be
-    :param cropped_height: the height that each image should be
+    :param img_data: the metadata of the images to normalize
+    :param normalized_cache: the cache to store normalized images in
+    :param left_eyes: a mapping from keys in [img_data] to coordinates of the left eye (i.e. the eye on the left in the
+    image, which is the person's anatomical right eye)
+    :param right_eyes: a mapping from keys in [img_data] to coordinates of the right eye (i.e. the eye on the right in
+    the image, which is the person's anatomical left eye)
     :return: `None`
     """
 
-    normalized_cache = ImageCache(cache_dir, "normalized", ".jpg")
-    cropped_cache = ImageCache(cache_dir, "cropped", ".jpg")
+    # Pre-compute normalization
+    img_paths = img_data.keys()
 
-    for image_path in tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")), desc="Cropping", file=sys.stdout):
-        image_hash = sha256sum(image_path)
-        cropped_size_hash = sha256sums(np.array2string(np.array([cropped_width, cropped_height])))
+    # Find scale for resizing
+    eye_dists = {it: math.dist(left_eyes[it], right_eyes[it]) for it in img_paths}
+    min_eye_dist = np.min(np.array(list(eye_dists.values())))
+    scales = {it: min_eye_dist / eye_dists[it] for it in img_paths}
+    scaled_img_dims = {it: (scales[it] * img_data[it]["dims"]).astype(int) for it in img_paths}
 
-        if cropped_cache.has(image_hash, [cropped_size_hash]):
-            pass
-        else:
-            image = normalized_cache.load_any(image_hash)
-            height, width = image.shape[:2]
+    # Find translation to align eyes
+    eye_centers = {it: np.mean([left_eyes[it], right_eyes[it]], axis=0).astype(int) for it in img_paths}
+    scaled_eye_centers = {it: (scales[it] * eye_centers[it]).astype(int) for it in img_paths}
+    max_scaled_eye_center = np.max(np.array(list(scaled_eye_centers.values())), axis=0)
+    translations = {it: max_scaled_eye_center - scaled_eye_centers[it] for it in img_paths}
 
-            width_excess = width - cropped_width
-            width_start = int(width_excess / 2)
-            width_end = width_start + cropped_width
+    # Find rotation angle
+    # Note that angle is negated because the y-axis is flipped by OpenCV, so a positive angle is a clockwise rotation
+    scaled_relative_right_eye_positions = {it: scales[it] * right_eyes[it] - scaled_eye_centers[it] for it in img_paths}
+    angles = {k: -math.atan2(v[1], v[0]) for k, v in scaled_relative_right_eye_positions.items()}
 
-            height_excess = height - cropped_height
-            height_start = int(height_excess / 2)
-            height_end = height_start + cropped_height
+    # Find cropping boundaries
+    img_corners_after_rotation = {it: rotate(max_scaled_eye_center,
+                                             translations[it] + get_corners(scaled_img_dims[it]),
+                                             angles[it]) for it in img_paths}
+    img_inner_boundaries = {it: largest_inner_rectangle(img_corners_after_rotation[it]) for it in img_paths}
+    min_inner_boundaries = rectangle_overlap(np.array(list(img_inner_boundaries.values())))
 
-            image = image[height_start:height_end, width_start:width_end]
-            cropped_cache.cache(image_hash, [cropped_size_hash], image)
+    # Perform normalization
+    pbar = tqdm(img_data.items(), desc="Normalizing images", file=sys.stdout)
+    for img_path, img_data in pbar:
+        eye_both = np.vstack([left_eyes[img_path], right_eyes[img_path]])
+        eye_hash = sha256sums(np.array2string(eye_both))
+
+        # Skip if cached
+        if normalized_cache.has(img_data["hash"], [eye_hash]):
+            continue
+
+        # Read image
+        img = cv2.imread(img_path)
+
+        # Resize
+        img = cv2.resize(img, scaled_img_dims[img_path])
+
+        # Translate
+        translation = np.float32([[1, 0, translations[img_path][0]], [0, 1, translations[img_path][1]]])
+        img = cv2.warpAffine(img, translation, scaled_img_dims[img_path] + translations[img_path])
+
+        # Rotate
+        if math.fabs(math.degrees(angles[img_path])) >= 45.0:
+            raise UserException(f"Image '{img_path}' is rotated by {math.degrees(angles[img_path])}, but Facemation "
+                                f"only supports angles up to 45 degrees (but preferably much lower)."
+                                f"You should manually rotate the image and crop out the relevant parts, or remove the "
+                                f"image from the inputs altogether.")
+
+        rotation = cv2.getRotationMatrix2D(max_scaled_eye_center.astype(float), -math.degrees(angles[img_path]), 1.0)
+        img = cv2.warpAffine(img, rotation, img.shape[1::-1], flags=cv2.INTER_LINEAR)
+
+        # Crop
+        img = img[min_inner_boundaries[1]:min_inner_boundaries[3], min_inner_boundaries[0]:min_inner_boundaries[2]]
+
+        # Store normalized image
+        normalized_cache.cache(img_data["hash"], [eye_hash], img)
 
 
-def add_captions(input_dir: str, cache_dir: str, filename_to_date: Callable[[str], date],
+def add_captions(img_data: Dict[str, MetaData],
+                 input_cache: ImageCache,
+                 captioned_cache: ImageCache,
+                 filename_to_date: Callable[[str], date],
                  date_to_caption: Callable[[date], str]) -> None:
     """
-    Adds a caption to each image in [input_dir] based on [filename_to_date] and [date_to_caption], storing the captioned
-    images in [cache_dir], renaming them based on their natsort indices.
+    For each image in [img_data], finds the corresponding image in [input_cache], and adds a caption using
+    [filename_to_date] and [date_to_caption], storing the captioned images in [captioned_cache].
 
     Raises a [UserException] if [date_to_caption] raises an exception.
 
-    :param input_dir: the directory with original input images
-    :param cache_dir: the directory to read cropped images from and cache captioned images in
+    :param img_data: the metadata of the images from which the normalized inputs are derived
+    :param input_cache: the cache to read the images to caption from, with keys matching those in [img_data]
+    :param captioned_cache: the cache to store captioned images in
     :param filename_to_date: converts a filename to a [date]
     :param date_to_caption: converts a [date] to a caption
     :return: `None`
     """
 
-    cropped_cache = ImageCache(cache_dir, "cropped", ".jpg")
-    captioned_cache = ImageCache(cache_dir, "captioned", ".jpg")
-
-    pbar = tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")), desc="Adding captions", file=sys.stdout)
-    for image_path in pbar:
-        image_name = os.path.basename(image_path)
-
+    for img_path, img_data in tqdm(img_data.items(), desc="Adding captions", file=sys.stdout):
         try:
             # TODO: Define `caption` as single function with access to all image metadata
-            caption = date_to_caption(filename_to_date(image_name))
+            caption = date_to_caption(filename_to_date(os.path.basename(img_path)))
         except Exception as exception:
-            pbar.close()
+            tqdm(natsorted(img_data.keys()), desc="Adding captions", file=sys.stdout).close()
+            # TODO: Clarify which image caused exception
             raise UserException("Failed to convert date to caption. "
                                 "Your 'filename_to_date' has been configured wrongly. "
                                 "Check your configuration for more details.", exception) from None
 
-        image_hash = sha256sum(image_path)
         caption_hash = sha256sums(caption)
-        if captioned_cache.has(image_hash, [caption_hash]):
+        if captioned_cache.has(img_data["hash"], [caption_hash]):
             continue
 
-        image = cropped_cache.load_any(image_hash)
-        image = write_on_image(image, caption, (0.05, 0.95), 0.05)
-        captioned_cache.cache(image_hash, [caption_hash], image)
+        # TODO: Make cache dependent on contents of `input_cache` as well, in case that changes
+        img = input_cache.load_any(img_data["hash"])
+        img = write_on_image(img, caption, (0.05, 0.95), 0.05)
+        captioned_cache.cache(img_data["hash"], [caption_hash], img)
 
 
-def demux_images(enabled: bool, input_dir: str, cache_dir: str, frames_dir: str, output_path: str, fps: int, crf: int,
-                 codec: str, video_filters: list[str]) -> None:
+def demux_images(enabled: bool,
+                 img_data: Dict[str, MetaData],
+                 input_cache: ImageCache,
+                 frames_dir: str,
+                 output_path: str,
+                 fps: int,
+                 crf: int,
+                 codec: str,
+                 video_filters: list[str]) -> None:
     """
-    Demuxes the images in [input_dir] into a video in [output_path] using FFmpeg.
+    Given the original input image in [img_data], selects the corresponding processed images from [input_cache] and
+    stores these in [frames_dir], and demuxes the contents of [frames_dir] into video in [output_path] using FFmpeg.
 
     Raises a [UserException] if FFmpeg has a non-zero exit code.
 
     :param enabled: `True` if and only if this function should run
-    :param input_dir: the directory with original input images
-    :param cache_dir: the directory to read processed images from
-    :param frames_dir: the directory to store frames in for FFmpeg
+    :param img_data: the metadata of the images from which the inputs are derived
+    :param input_cache: the cache to select frames to process from
+    :param frames_dir: the directory to store frame links in for FFmpeg
     :param output_path: the path relative to [input_dir] to save the created video as
     :param fps: the frames per second
     :param crf: the constant rate factor
@@ -287,12 +273,10 @@ def demux_images(enabled: bool, input_dir: str, cache_dir: str, frames_dir: str,
     """
 
     if enabled:
-        captioned_cache = ImageCache(cache_dir, "captioned", ".jpg")
-
-        pbar = tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")), desc="Selecting frames", file=sys.stdout)
+        pbar = tqdm(natsorted(img_data.keys()), desc="Selecting frames", file=sys.stdout)
         for idx, image_path in enumerate(pbar):
-            image_hash = sha256sum(image_path)
-            captioned_path = captioned_cache.get_path_any(image_hash)
+            image_hash = sha256sum(img_data[image_path]["hash"])
+            captioned_path = input_cache.get_path_any(image_hash)
             os.symlink(Path(captioned_path).absolute(), f"{frames_dir}/{idx}.jpg")
 
         print("Demuxing into video:")
@@ -357,17 +341,20 @@ def main() -> None:
 
     # Run facemation
     try:
+        face_cache = NdarrayCache(cfg.cache_dir, "face", ".cache")
+        normalized_cache = ImageCache(cfg.cache_dir, "normalized", ".jpg")
+        captioned_cache = ImageCache(cfg.cache_dir, "captioned", ".jpg")
+
         # Pre-process
-        eyes_left, eyes_right = find_faces(cfg.input_dir, cfg.cache_dir, cfg.error_dir, cfg.face_selection_override,
+        image_data = read_image_data(cfg.input_dir)
+        left_eyes, right_eyes = find_faces(image_data, face_cache, cfg.error_dir, cfg.face_selection_override,
                                            shape_predictor)
 
         # Process
-        width_min, height_min = normalize_images(cfg.input_dir, cfg.cache_dir, cfg.normalize_draw_debug,
-                                                 eyes_left, eyes_right)
-        crop_images(cfg.input_dir, cfg.cache_dir, width_min, height_min)
+        normalize_images(image_data, normalized_cache, left_eyes, right_eyes)
 
         # Post-process
-        add_captions(cfg.input_dir, cfg.cache_dir, cfg.filename_to_date, cfg.date_to_caption)
+        add_captions(image_data, normalized_cache, captioned_cache, cfg.filename_to_date, cfg.date_to_caption)
 
         # Demux
         demux_images(cfg.ffmpeg_enabled, cfg.input_dir, cfg.cache_dir, cfg.frames_dir, cfg.output_path,

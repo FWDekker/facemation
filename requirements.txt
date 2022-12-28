@@ -1,6 +1,5 @@
 dlib==19.24.0
-imutils==0.5.4
 natsort==8.2.0
-numpy==1.24.0
+numpy==1.24.1
 opencv-python==4.5.5.64
 tqdm==4.64.1
