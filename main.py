@@ -6,7 +6,7 @@ import subprocess
 import sys
 from datetime import date
 from pathlib import Path
-from typing import Callable, Dict, Tuple, TypedDict
+from typing import Callable, Dict, TypedDict
 
 import cv2
 import dlib
@@ -48,42 +48,33 @@ def read_image_data(input_dir: str) -> Dict[str, MetaData]:
     return image_data
 
 
-def find_faces(img_data: Dict[str, MetaData],
+def find_faces(imgs: Dict[str, MetaData],
                face_cache: NdarrayCache,
                error_dir: str,
                face_selection_override: Dict[str, Callable[[dlib.full_object_detection], int]],
-               shape_predictor: dlib.shape_predictor) -> Tuple[Dict[str, Coords], Dict[str, Coords]]:
+               shape_predictor: dlib.shape_predictor) -> None:
     """
-    Finds one face in each image in [img_data], with each face expressed as the positions of the eyes, caching the face
-    data in [face_cache], and returning the found eye positions.
+    Finds one face in each image in [imgs], with each face expressed as the positions of the eyes, caching the face data
+    in [face_cache], and returning the found eye positions.
 
     Raises a [UserException] if no or multiple faces are found in an image. Additionally, if multiple faces are found,
     the image is written to [error_dir] with debugging information.
 
-    :param img_data: the metadata of the images to detect faces in
+    :param imgs: the metadata of the images to detect faces in
     :param face_cache: the cache to store found faces in
     :param error_dir: the directory to write debugging information in to assist the user
     :param shape_predictor: a function that extracts faces from an image
     :param face_selection_override: selects the index of the face to return if multiple faces are found
-    :return: a mapping from keys in [img_data] to left eye positions, and a mapping from keys in [img_data] to right eye
-    positions; note that "left eye" refers to the eye on the left in the image, rather than the person's anatomical left
-    eye
+    :return: `None`
     """
-
-    left_eyes = {}
-    right_eyes = {}
 
     detector = dlib.get_frontal_face_detector()
 
-    for img_path, img_data in tqdm(img_data.items(), desc="Detecting faces", file=sys.stdout):
-        # Read from cache if exists
+    for img_path, img_data in tqdm(imgs.items(), desc="Detecting faces", file=sys.stdout):
         if face_cache.has(img_data["hash"], []):
-            eyes_both = face_cache.load(img_data["hash"], [])
-            left_eyes[img_path] = eyes_both[0]
-            right_eyes[img_path] = eyes_both[1]
             continue
 
-        # Detect eyes
+        # Find face
         img = cv2.imread(img_path)
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
@@ -118,47 +109,41 @@ def find_faces(img_data: Dict[str, MetaData],
             face = faces[0]
 
         # Store results
-        left_eyes[img_path] = np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(36, 42)]), axis=0)
-        right_eyes[img_path] = np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(42, 48)]), axis=0)
-        face_cache.cache(img_data["hash"], [], np.vstack([left_eyes[img_path], right_eyes[img_path]]))
-
-    return left_eyes, right_eyes
+        left_eye = np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(36, 42)]), axis=0)
+        right_eye = np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(42, 48)]), axis=0)
+        face_cache.cache(img_data["hash"], [], np.vstack([left_eye, right_eye]))
 
 
-def normalize_images(img_data: Dict[str, MetaData],
-                     normalized_cache: ImageCache,
-                     left_eyes: Dict[str, Coords],
-                     right_eyes: Dict[str, Coords]) -> None:
+def normalize_images(imgs: Dict[str, MetaData],
+                     face_cache: NdarrayCache,
+                     normalized_cache: ImageCache) -> None:
     """
-    Translates, rotates, and resizes each file in [img_data], storing the results in [normalized_cache].
+    Translates, rotates, and resizes each file in [imgs], storing the results in [normalized_cache].
 
-    :param img_data: the metadata of the images to normalize
+    :param imgs: the metadata of the images to normalize
+    :param face_cache: the cache to read found faces from
     :param normalized_cache: the cache to store normalized images in
-    :param left_eyes: a mapping from keys in [img_data] to coordinates of the left eye (i.e. the eye on the left in the
-    image, which is the person's anatomical right eye)
-    :param right_eyes: a mapping from keys in [img_data] to coordinates of the right eye (i.e. the eye on the right in
-    the image, which is the person's anatomical left eye)
     :return: `None`
     """
 
-    # Pre-compute normalization
-    img_paths = img_data.keys()
+    img_paths = imgs.keys()
+    eyes = {it: face_cache.load(imgs[it]["hash"], []) for it in img_paths}
 
     # Find scale for resizing
-    eye_dists = {it: math.dist(left_eyes[it], right_eyes[it]) for it in img_paths}
+    eye_dists = {it: math.dist(eyes[it][0], eyes[it][1]) for it in img_paths}
     min_eye_dist = np.min(np.array(list(eye_dists.values())))
     scales = {it: min_eye_dist / eye_dists[it] for it in img_paths}
-    scaled_img_dims = {it: (scales[it] * img_data[it]["dims"]).astype(int) for it in img_paths}
+    scaled_img_dims = {it: (scales[it] * imgs[it]["dims"]).astype(int) for it in img_paths}
 
     # Find translation to align eyes
-    eye_centers = {it: np.mean([left_eyes[it], right_eyes[it]], axis=0).astype(int) for it in img_paths}
+    eye_centers = {it: np.mean([eyes[it][0], eyes[it][1]], axis=0).astype(int) for it in img_paths}
     scaled_eye_centers = {it: (scales[it] * eye_centers[it]).astype(int) for it in img_paths}
     max_scaled_eye_center = np.max(np.array(list(scaled_eye_centers.values())), axis=0)
     translations = {it: max_scaled_eye_center - scaled_eye_centers[it] for it in img_paths}
 
     # Find rotation angle
     # Note that angle is negated because the y-axis is flipped by OpenCV, so a positive angle is a clockwise rotation
-    scaled_relative_right_eye_positions = {it: scales[it] * right_eyes[it] - scaled_eye_centers[it] for it in img_paths}
+    scaled_relative_right_eye_positions = {it: scales[it] * eyes[it][1] - scaled_eye_centers[it] for it in img_paths}
     angles = {k: -math.atan2(v[1], v[0]) for k, v in scaled_relative_right_eye_positions.items()}
 
     # Find cropping boundaries
@@ -169,10 +154,9 @@ def normalize_images(img_data: Dict[str, MetaData],
     min_inner_boundaries = rectangle_overlap(np.array(list(img_inner_boundaries.values())))
 
     # Perform normalization
-    pbar = tqdm(img_data.items(), desc="Normalizing images", file=sys.stdout)
+    pbar = tqdm(imgs.items(), desc="Normalizing images", file=sys.stdout)
     for img_path, img_data in pbar:
-        eye_both = np.vstack([left_eyes[img_path], right_eyes[img_path]])
-        eye_hash = sha256sums(np.array2string(eye_both))
+        eye_hash = sha256sums(np.array2string(eyes[img_path]))
 
         # Skip if cached
         if normalized_cache.has(img_data["hash"], [eye_hash]):
@@ -205,26 +189,26 @@ def normalize_images(img_data: Dict[str, MetaData],
         normalized_cache.cache(img_data["hash"], [eye_hash], img)
 
 
-def add_captions(img_data: Dict[str, MetaData],
+def add_captions(imgs: Dict[str, MetaData],
                  input_cache: ImageCache,
                  captioned_cache: ImageCache,
                  filename_to_date: Callable[[str], date],
                  date_to_caption: Callable[[date], str]) -> None:
     """
-    For each image in [img_data], finds the corresponding image in [input_cache], and adds a caption using
+    For each image in [imgs], finds the corresponding image in [input_cache], and adds a caption using
     [filename_to_date] and [date_to_caption], storing the captioned images in [captioned_cache].
 
     Raises a [UserException] if [date_to_caption] raises an exception.
 
-    :param img_data: the metadata of the images from which the normalized inputs are derived
-    :param input_cache: the cache to read the images to caption from, with keys matching those in [img_data]
+    :param imgs: the metadata of the images from which the normalized inputs are derived
+    :param input_cache: the cache to read the images to caption from, with keys matching those in [imgs]
     :param captioned_cache: the cache to store captioned images in
     :param filename_to_date: converts a filename to a [date]
     :param date_to_caption: converts a [date] to a caption
     :return: `None`
     """
 
-    for img_path, img_data in tqdm(img_data.items(), desc="Adding captions", file=sys.stdout):
+    for img_path, img_data in tqdm(imgs.items(), desc="Adding captions", file=sys.stdout):
         try:
             # TODO: Define `caption` as single function with access to all image metadata
             caption = date_to_caption(filename_to_date(os.path.basename(img_path)))
@@ -239,14 +223,13 @@ def add_captions(img_data: Dict[str, MetaData],
         if captioned_cache.has(img_data["hash"], [caption_hash]):
             continue
 
-        # TODO: Make cache dependent on contents of `input_cache` as well, in case that changes
         img = input_cache.load_any(img_data["hash"])
         img = write_on_image(img, caption, (0.05, 0.95), 0.05)
         captioned_cache.cache(img_data["hash"], [caption_hash], img)
 
 
 def demux_images(enabled: bool,
-                 img_data: Dict[str, MetaData],
+                 imgs: Dict[str, MetaData],
                  input_cache: ImageCache,
                  frames_dir: str,
                  output_path: str,
@@ -255,13 +238,13 @@ def demux_images(enabled: bool,
                  codec: str,
                  video_filters: list[str]) -> None:
     """
-    Given the original input image in [img_data], selects the corresponding processed images from [input_cache] and
-    stores these in [frames_dir], and demuxes the contents of [frames_dir] into video in [output_path] using FFmpeg.
+    Given the original input image in [imgs], selects the corresponding processed images from [input_cache] and stores
+    these in [frames_dir], and demuxes the contents of [frames_dir] into video in [output_path] using FFmpeg.
 
     Raises a [UserException] if FFmpeg has a non-zero exit code.
 
     :param enabled: `True` if and only if this function should run
-    :param img_data: the metadata of the images from which the inputs are derived
+    :param imgs: the metadata of the images from which the inputs are derived
     :param input_cache: the cache to select frames to process from
     :param frames_dir: the directory to store frame links in for FFmpeg
     :param output_path: the path relative to [input_dir] to save the created video as
@@ -273,9 +256,9 @@ def demux_images(enabled: bool,
     """
 
     if enabled:
-        pbar = tqdm(natsorted(img_data.keys()), desc="Selecting frames", file=sys.stdout)
+        pbar = tqdm(natsorted(imgs.keys()), desc="Selecting frames", file=sys.stdout)
         for idx, image_path in enumerate(pbar):
-            image_hash = sha256sum(img_data[image_path]["hash"])
+            image_hash = sha256sum(imgs[image_path]["hash"])
             captioned_path = input_cache.get_path_any(image_hash)
             os.symlink(Path(captioned_path).absolute(), f"{frames_dir}/{idx}.jpg")
 
@@ -346,15 +329,14 @@ def main() -> None:
         captioned_cache = ImageCache(cfg.cache_dir, "captioned", ".jpg")
 
         # Pre-process
-        image_data = read_image_data(cfg.input_dir)
-        left_eyes, right_eyes = find_faces(image_data, face_cache, cfg.error_dir, cfg.face_selection_override,
-                                           shape_predictor)
+        imgs = read_image_data(cfg.input_dir)
+        find_faces(imgs, face_cache, cfg.error_dir, cfg.face_selection_override, shape_predictor)
 
         # Process
-        normalize_images(image_data, normalized_cache, left_eyes, right_eyes)
+        normalize_images(imgs, face_cache, normalized_cache)
 
         # Post-process
-        add_captions(image_data, normalized_cache, captioned_cache, cfg.filename_to_date, cfg.date_to_caption)
+        add_captions(imgs, normalized_cache, captioned_cache, cfg.filename_to_date, cfg.date_to_caption)
 
         # Demux
         demux_images(cfg.ffmpeg_enabled, cfg.input_dir, cfg.cache_dir, cfg.frames_dir, cfg.output_path,
