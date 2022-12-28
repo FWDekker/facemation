@@ -1,3 +1,4 @@
+import functools
 import glob
 import math
 import os
@@ -6,13 +7,15 @@ import subprocess
 import sys
 from datetime import date
 from pathlib import Path
-from typing import Callable, Dict, TypedDict
+from typing import Callable, Dict, TypedDict, Tuple
 
 import cv2
 import dlib
 import numpy as np
+from PIL import Image
 from natsort import natsorted
 from tqdm import tqdm
+from tqdm.contrib.concurrent import process_map
 
 from Cache import ImageCache, NdarrayCache
 from ConfigHelper import load_config
@@ -40,22 +43,81 @@ def read_image_data(input_dir: str) -> Dict[str, MetaData]:
     for image_path in pbar:
         image_hash = sha256sum(image_path)
 
-        image = cv2.imread(image_path)
-        height, width = image.shape[:2]
+        image = Image.open(image_path)
+        width, height = image.size
+        exif = image.getexif().get(0x0112)
+        if exif == 6 or exif == 8:
+            width, height = height, width
 
         image_data[image_path] = {"hash": image_hash, "dims": np.array([width, height])}
 
     return image_data
 
 
-def find_faces(imgs: Dict[str, MetaData],
-               face_cache: NdarrayCache,
-               error_dir: str,
-               face_selection_override: Dict[str, Callable[[dlib.full_object_detection], int]],
-               shape_predictor: dlib.shape_predictor) -> None:
+def find_face(img: Tuple[str, MetaData], face_cache: NdarrayCache, error_dir: str) -> None:
+    """
+    Finds the face in [img], expressed as the positions of the eyes, caching the face data in [face_cache].
+
+    Raises a [UserException] if no or multiple faces are found in an image, and [cfg.face_selection_override] is not
+    configured for this image. Additionally, if an exception is thrown, the image is written to [error_dir] with
+    visualized debugging information.
+
+    :param img: the path to and metadata of the image to find the face in
+    :param face_cache: the cache to store the found face in
+    :param error_dir: the directory to write debugging information in to assist the user
+    :return: `None`
+    """
+
+    img_path, img_data = img
+
+    if face_cache.has(img_data["hash"], []):
+        return
+
+    # Find face
+    img = cv2.imread(img_path)
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    detections = detector(img_rgb, 1)
+
+    faces = dlib.full_object_detections()
+    for detection in detections:
+        faces.append(shape_predictor(img_rgb, detection))
+
+    # Determine what to do if there are multiple faces
+    if len(faces) == 0:
+        raise UserException(f"Not enough faces: Found 0 faces in '{img_path}'.")
+    elif len(faces) > 1:
+        img_name = os.path.basename(img_path)  # Includes file extension
+
+        if img_name in cfg.face_selection_override:
+            face = sorted(list(faces), key=cfg.face_selection_override[img_name])[0]
+        else:
+            bb = [it.rect for it in faces]
+            bb = [((it.left(), it.top()), (it.right(), it.bottom())) for it in bb]
+            for it in bb:
+                img = cv2.rectangle(img, it[0], it[1], (255, 0, 0), 5)
+            cv2.imwrite(f"{error_dir}/{img_name}", img)
+
+            raise UserException(f"Too many faces: Found {len(faces)} in '{img_path}'. "
+                                f"The image has been stored in '{Path(error_dir).absolute()}' with squares drawn "
+                                f"around all faces that were found. "
+                                f"You can select which face should be used by adjusting the 'face_selection_override' "
+                                f"option; "
+                                f"see 'config_default.py' for more information.")
+    else:
+        face = faces[0]
+
+    # Store results
+    # Note that the "left eye" is the left-most eye in the image, i.e. the anatomical "right eye"
+    left_eye = np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(36, 42)]), axis=0)
+    right_eye = np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(42, 48)]), axis=0)
+    face_cache.cache(img_data["hash"], [], np.vstack([left_eye, right_eye]))
+
+
+def find_all_faces(imgs: Dict[str, MetaData], face_cache: NdarrayCache, error_dir: str) -> None:
     """
     Finds one face in each image in [imgs], with each face expressed as the positions of the eyes, caching the face data
-    in [face_cache], and returning the found eye positions.
+    in [face_cache].
 
     Raises a [UserException] if no or multiple faces are found in an image. Additionally, if multiple faces are found,
     the image is written to [error_dir] with debugging information.
@@ -63,55 +125,12 @@ def find_faces(imgs: Dict[str, MetaData],
     :param imgs: the metadata of the images to detect faces in
     :param face_cache: the cache to store found faces in
     :param error_dir: the directory to write debugging information in to assist the user
-    :param shape_predictor: a function that extracts faces from an image
-    :param face_selection_override: selects the index of the face to return if multiple faces are found
     :return: `None`
     """
 
-    detector = dlib.get_frontal_face_detector()
-
-    for img_path, img_data in tqdm(imgs.items(), desc="Detecting faces", file=sys.stdout):
-        if face_cache.has(img_data["hash"], []):
-            continue
-
-        # Find face
-        img = cv2.imread(img_path)
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-        detections = detector(img_rgb, 1)
-
-        faces = dlib.full_object_detections()
-        for detection in detections:
-            faces.append(shape_predictor(img_rgb, detection))
-
-        # Determine what to do if there are multiple faces
-        if len(faces) == 0:
-            raise UserException(f"Not enough faces: Found 0 faces in '{img_path}'.")
-        elif len(faces) > 1:
-            img_name = os.path.basename(img_path)  # Includes file extension
-
-            if img_name in face_selection_override:
-                face = sorted(list(faces), key=face_selection_override[img_name])[0]
-            else:
-                bb = [it.rect for it in faces]
-                bb = [((it.left(), it.top()), (it.right(), it.bottom())) for it in bb]
-                for it in bb:
-                    img = cv2.rectangle(img, it[0], it[1], (255, 0, 0), 5)
-                cv2.imwrite(f"{error_dir}/{img_name}", img)
-
-                raise UserException(f"Too many faces: Found {len(faces)} in '{img_path}'. "
-                                    f"The image has been stored in '{Path(error_dir).absolute()}' with squares drawn "
-                                    f"around all faces that were found. "
-                                    f"You can select which face should be used by adjusting the "
-                                    f"'face_selection_override' option; "
-                                    f"see 'config_default.py' for more information.")
-        else:
-            face = faces[0]
-
-        # Store results
-        left_eye = np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(36, 42)]), axis=0)
-        right_eye = np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(42, 48)]), axis=0)
-        face_cache.cache(img_data["hash"], [], np.vstack([left_eye, right_eye]))
+    process_map(functools.partial(find_face, face_cache=face_cache, error_dir=error_dir), imgs.items(),
+                desc="Detecting faces",
+                file=sys.stdout)
 
 
 def normalize_images(imgs: Dict[str, MetaData],
@@ -152,14 +171,19 @@ def normalize_images(imgs: Dict[str, MetaData],
                                              angles[it]) for it in img_paths}
     img_inner_boundaries = {it: largest_inner_rectangle(img_corners_after_rotation[it]) for it in img_paths}
     min_inner_boundaries = rectangle_overlap(np.array(list(img_inner_boundaries.values())))
+    min_inner_boundaries = (np.floor(min_inner_boundaries / 2) * 2).astype(int)
 
     # Perform normalization
     pbar = tqdm(imgs.items(), desc="Normalizing images", file=sys.stdout)
     for img_path, img_data in pbar:
         eye_hash = sha256sums(np.array2string(eyes[img_path]))
+        normalization_hash = sha256sums(np.array2string(np.hstack([scales[img_path],
+                                                                   translations[img_path],
+                                                                   angles[img_path],
+                                                                   min_inner_boundaries])))
 
         # Skip if cached
-        if normalized_cache.has(img_data["hash"], [eye_hash]):
+        if normalized_cache.has(img_data["hash"], [eye_hash, normalization_hash]):
             continue
 
         # Read image
@@ -186,7 +210,7 @@ def normalize_images(imgs: Dict[str, MetaData],
         img = img[min_inner_boundaries[1]:min_inner_boundaries[3], min_inner_boundaries[0]:min_inner_boundaries[2]]
 
         # Store normalized image
-        normalized_cache.cache(img_data["hash"], [eye_hash], img)
+        normalized_cache.cache(img_data["hash"], [eye_hash, normalization_hash], img)
 
 
 def add_captions(imgs: Dict[str, MetaData],
@@ -208,12 +232,13 @@ def add_captions(imgs: Dict[str, MetaData],
     :return: `None`
     """
 
-    for img_path, img_data in tqdm(imgs.items(), desc="Adding captions", file=sys.stdout):
+    pbar = tqdm(imgs.items(), desc="Adding captions", file=sys.stdout)
+    for img_path, img_data in pbar:
         try:
             # TODO: Define `caption` as single function with access to all image metadata
             caption = date_to_caption(filename_to_date(os.path.basename(img_path)))
         except Exception as exception:
-            tqdm(natsorted(img_data.keys()), desc="Adding captions", file=sys.stdout).close()
+            pbar.close()
             # TODO: Clarify which image caused exception
             raise UserException("Failed to convert date to caption. "
                                 "Your 'filename_to_date' has been configured wrongly. "
@@ -258,8 +283,7 @@ def demux_images(enabled: bool,
     if enabled:
         pbar = tqdm(natsorted(imgs.keys()), desc="Selecting frames", file=sys.stdout)
         for idx, image_path in enumerate(pbar):
-            image_hash = sha256sum(imgs[image_path]["hash"])
-            captioned_path = input_cache.get_path_any(image_hash)
+            captioned_path = input_cache.get_path_any(imgs[image_path]["hash"])
             os.symlink(Path(captioned_path).absolute(), f"{frames_dir}/{idx}.jpg")
 
         print("Demuxing into video:")
@@ -289,7 +313,6 @@ def main() -> None:
 
     :return: `None`
     """
-    cfg = load_config()
 
     # Clean up from previous runs
     if Path(cfg.error_dir).exists():
@@ -298,10 +321,10 @@ def main() -> None:
         shutil.rmtree(cfg.frames_dir)
     Path(cfg.output_path).unlink(missing_ok=True)
 
-    Path(cfg.input_dir).mkdir(exist_ok=True)
-    Path(cfg.error_dir).mkdir(exist_ok=True)
-    Path(cfg.cache_dir).mkdir(exist_ok=True)
-    Path(cfg.frames_dir).mkdir(exist_ok=True)
+    Path(cfg.input_dir).mkdir(parents=True, exist_ok=True)
+    Path(cfg.error_dir).mkdir(parents=True, exist_ok=True)
+    Path(cfg.cache_dir).mkdir(parents=True, exist_ok=True)
+    Path(cfg.frames_dir).mkdir(parents=True, exist_ok=True)
 
     # Validate requirements and inputs
     if cfg.ffmpeg_enabled and shutil.which("ffmpeg") is None:
@@ -314,7 +337,6 @@ def main() -> None:
               f"Make sure to download the file from the link in the README and place it in the same directory as "
               f"'main.py'.", file=sys.stderr)
         return
-    shape_predictor = dlib.shape_predictor(cfg.shape_predictor)
 
     if (not Path(cfg.input_dir).exists()) or len(glob.glob(f"{cfg.input_dir}/*.jpg")) == 0:
         print(f"No images detected in '{Path(cfg.input_dir).absolute()}'. "
@@ -328,19 +350,12 @@ def main() -> None:
         normalized_cache = ImageCache(cfg.cache_dir, "normalized", ".jpg")
         captioned_cache = ImageCache(cfg.cache_dir, "captioned", ".jpg")
 
-        # Pre-process
         imgs = read_image_data(cfg.input_dir)
-        find_faces(imgs, face_cache, cfg.error_dir, cfg.face_selection_override, shape_predictor)
-
-        # Process
+        find_all_faces(imgs, face_cache, cfg.error_dir)
         normalize_images(imgs, face_cache, normalized_cache)
-
-        # Post-process
         add_captions(imgs, normalized_cache, captioned_cache, cfg.filename_to_date, cfg.date_to_caption)
-
-        # Demux
-        demux_images(cfg.ffmpeg_enabled, cfg.input_dir, cfg.cache_dir, cfg.frames_dir, cfg.output_path,
-                     cfg.ffmpeg_fps, cfg.ffmpeg_crf, cfg.ffmpeg_codec, cfg.ffmpeg_video_filters)
+        demux_images(cfg.ffmpeg_enabled, imgs, captioned_cache, cfg.frames_dir, cfg.output_path, cfg.ffmpeg_fps,
+                     cfg.ffmpeg_crf, cfg.ffmpeg_codec, cfg.ffmpeg_video_filters)
 
         print("Done!")
     except UserException as exception:
@@ -348,4 +363,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Create globals to reduce process communication
+    cfg = load_config()
+    detector = dlib.get_frontal_face_detector()
+    shape_predictor = dlib.shape_predictor(cfg.shape_predictor)
+
+    # Invoke main
     main()
