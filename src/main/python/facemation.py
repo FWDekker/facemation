@@ -22,6 +22,7 @@ from ConfigHelper import load_config
 from HashHelper import sha256sum, sha256sums
 from ImageHelper import write_on_image
 from MathHelper import rotate, get_corners, largest_inner_rectangle, rectangle_overlap
+from ResourceHelper import resource_path
 from UserException import UserException
 
 Coords = np.ndarray  # x, y
@@ -334,12 +335,6 @@ def main() -> None:
               f"Check the README for more information on the requirements.", file=sys.stderr)
         return
 
-    if not Path(cfg.shape_predictor).exists():
-        print(f"Face detector '{Path(cfg.shape_predictor).absolute()}' could not be found. "
-              f"Make sure to download the file from the link in the README and place it in the same directory as "
-              f"'main.py'.", file=sys.stderr)
-        return
-
     if (not Path(cfg.input_dir).exists()) or len(glob.glob(f"{cfg.input_dir}/*.jpg")) == 0:
         print(f"No images detected in '{Path(cfg.input_dir).absolute()}'. "
               f"Are you sure you put them in the right place?",
@@ -368,7 +363,7 @@ if __name__ == "__main__":
     # Create globals to reduce process communication
     cfg = load_config()
     detector = dlib.get_frontal_face_detector()
-    shape_predictor = dlib.shape_predictor(cfg.shape_predictor)
+    shape_predictor = dlib.shape_predictor(resource_path("shape_predictor_68_face_landmarks.dat"))
 
     # Invoke main
     main()

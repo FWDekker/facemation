@@ -1,14 +1,11 @@
 from datetime import datetime
 
 
-# This file contains the default configuration. To change the configuration, either edit this file directly, or create
-# a copy called `config.py` and adjust the values there. Values in `config.py` will always override those in this file.
+# This file contains the default configuration. To change the configuration, override settings in the `config.py` file,
+# which must be in the same directory as the Facemation executable.
 
 
 config = {
-    # Predictor to use for finding facial features. You probably don't need to change this.
-    "shape_predictor": "shape_predictor_68_face_landmarks.dat",
-
     # (Relative) directory to find the original frames in.
     "input_dir": "input/",
     # (Relative) directory to store images in that caused an error.
@@ -17,7 +14,7 @@ config = {
     "cache_dir": "output/cache/",
     # (Relative) directory to store final frames in.
     "frames_dir": "output/frames/",
-    # (Relative) directory to store created video in, relative to `output_frames_dir`.
+    # (Relative) directory to store created video in, relative to `frames_dir`.
     "output_path": "../facemation.mp4",
 
     # Converts the filename of an image to the date on which it was taken.

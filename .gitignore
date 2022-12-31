@@ -156,6 +156,7 @@ cython_debug/
 ## Custom
 input/
 output/
-config.py
 *.dat
 *.xml
+config_dev.py
+facemation*.zip
