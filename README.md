@@ -9,14 +9,13 @@ compiles these frames into a timelapse.
 
 ## How to use
 1. Check that you satisfy all the above requirements.
-2. [Download the latest version of Facemation.](https://git.fwdekker.com/fwdekker.com/template/releases/latest)
+2. [Download the latest version of Facemation.](https://github.com/FWDekker/facemation/releases/latest)
    Unzip the downloaded archive.
 3. Put your images in the `input/` folder.
    Files are processed in [natural sort order](https://en.wikipedia.org/wiki/Natural_sort_order).
 4. (_Optional_) Configure Facemation by editing `config.py`.
-   Check
-   [`config_default.py`](https://git.fwdekker.com/FWDekker/facemation/src/branch/master/src/main/python/config_default.py)
-   for a list of all options.
+   Check [`config_default.py`](https://github.com/FWDekker/facemation/blob/master/src/main/python/config_default.py) for
+   a list of all options.
 5. Run the downloaded Facemation executable.
 6. Check the output and adjust the configuration as desired.
    All intermediate results are heavily cached, so subsequent runs are much faster.
@@ -62,7 +61,7 @@ python3 -m facemation
    pyinstaller -y --clean -F --add-data="shape_predictor_68_face_landmarks.dat:." src/main/python/facemation.py
    cp src/main/python/config_empty.py dist/config.py
    pip-licenses --with-license-file --no-license-path --output-file=dist/THIRD_PARTY_LICENSES
-   python3 -m zipfile -c facemation.zip dist/*
+   python3 -m zipfile -c "facemation-<system>-<version>.zip" dist/*
    ```
 2. Run executable:
    ```shell
