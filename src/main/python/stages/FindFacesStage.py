@@ -11,8 +11,8 @@ from tqdm.contrib.concurrent import process_map
 
 import Resolver
 from Cache import NdarrayCache
-from ReadInputsStage import ImageMetadata
 from UserException import UserException
+from stages.ReadInputsStage import ImageMetadata
 
 # Global field because this cannot be pickled between processes
 g_face_selection_override: Dict[str, Callable[[dlib.full_object_detection], int]]
@@ -23,7 +23,7 @@ def find_all_faces(imgs: Dict[str, ImageMetadata], face_cache: NdarrayCache,
                    error_dir: str) -> None:
     """
     Finds one face in each image in [imgs], with each face expressed as the positions of the eyes, caching the face data
-     in [face_cache].
+    in [face_cache].
 
     Raises a [UserException] if no or multiple faces are found in an image. Additionally, if multiple faces are found,
     the image is written to [error_dir] with debugging information.

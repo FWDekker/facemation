@@ -27,7 +27,7 @@ compiles these frames into a timelapse.
 * [`venv`](https://docs.python.org/3/tutorial/venv.html) (e.g. `apt install python3-venv`)
 * [`cmake`](https://cmake.org/) (e.g. `apt install cmake`) (required to install `dlib` dependency)
 * [FFmpeg](https://ffmpeg.org/) (e.g. `apt install ffmpeg`) (to demux frames into a video)
-* [shape_predictor_68_face_landmarks.dat](http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2) (in your working directory)
+* [shape_predictor_68_face_landmarks.dat](http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2) (into `src/main/python/resources/`)
 
 ### Setup
 1. Check that you satisfy all the above requirements.
@@ -59,10 +59,13 @@ python3 -m facemation
 ### Build
 1. Build executable into `dist/`:
    ```shell
-   pyinstaller -y --clean -F --add-data="shape_predictor_68_face_landmarks.dat:." src/main/python/facemation.py
-   cp src/main/python/config_empty.py dist/config.py
+   # Linux
+   pyinstaller -y --clean -F --add-data="src/main/resources/*:." src/main/python/facemation.py
+   cp src/main/resources/config_empty.py dist/config.py
    pip-licenses --with-license-file --no-license-path --output-file=dist/THIRD_PARTY_LICENSES
    python3 -m zipfile -c "facemation-<system>-<version>.zip" dist/*
+   # Windows
+   # TODO
    ```
 2. Run executable:
    ```shell

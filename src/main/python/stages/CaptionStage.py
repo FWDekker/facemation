@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 import SHA256
 from Cache import ImageCache
-from ReadInputsStage import ImageMetadata
+from stages.ReadInputsStage import ImageMetadata
 
 
 def add_captions(imgs: Dict[str, ImageMetadata],

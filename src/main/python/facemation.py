@@ -4,12 +4,12 @@ import sys
 from pathlib import Path
 
 from Cache import ImageCache, NdarrayCache
-from CaptionStage import add_captions
-from ConfigHelper import load_config
-from DemuxStage import demux_images
-from FindFacesStage import find_all_faces
-from NormalizeStage import normalize_images
-from ReadInputsStage import read_image_data
+from stages.CaptionStage import add_captions
+from Config import load_config
+from stages.DemuxStage import demux_images
+from stages.FindFacesStage import find_all_faces
+from stages.NormalizeStage import normalize_images
+from stages.ReadInputsStage import read_image_data
 from UserException import UserException
 
 

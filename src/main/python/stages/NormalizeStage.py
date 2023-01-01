@@ -8,8 +8,8 @@ from tqdm import tqdm
 
 import SHA256
 from Cache import NdarrayCache, ImageCache
-from ReadInputsStage import ImageMetadata
 from UserException import UserException
+from stages.ReadInputsStage import ImageMetadata
 
 
 def normalize_images(imgs: Dict[str, ImageMetadata],

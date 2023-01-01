@@ -8,9 +8,8 @@ from natsort import natsorted
 from tqdm import tqdm
 
 import SHA256
-from Types import Dimensions
 
-ImageMetadata = TypedDict("ImageMetadata", {"hash": str, "dims": Dimensions})
+ImageMetadata = TypedDict("ImageMetadata", {"hash": str, "dims": np.ndarray})
 
 
 def read_image_data(input_dir: str) -> Dict[str, ImageMetadata]:

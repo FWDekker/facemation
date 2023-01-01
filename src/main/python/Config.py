@@ -16,11 +16,12 @@ def load_config() -> FacemationConfig:
     :return: the combined configuration
     """
 
-    from config_default import config as cfg_default
+    cfg_default_path = Resolver.resource_path("config_default.py")
+    cfg_default = SourceFileLoader("cfg_default", str(cfg_default_path)).load_module().config
 
     cfg_user_path = Resolver.exe_relative_path("config.py")
     if cfg_user_path.exists():
-        cfg_user = SourceFileLoader("cfg_user", str(cfg_user_path)).load_module().config
+        cfg_user = SourceFileLoader("cfg_user", str(cfg_user_path.resolve())).load_module().config
     else:
         cfg_user = {}
 

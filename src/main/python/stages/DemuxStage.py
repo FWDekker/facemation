@@ -7,9 +7,9 @@ from natsort import natsorted
 from tqdm import tqdm
 
 from Cache import ImageCache
-from ConfigHelper import FacemationConfig
-from ReadInputsStage import ImageMetadata
+from Config import FacemationConfig
 from UserException import UserException
+from stages.ReadInputsStage import ImageMetadata
 
 
 def demux_images(imgs: Dict[str, ImageMetadata], input_cache: ImageCache, frames_dir: str, output_path: str,
