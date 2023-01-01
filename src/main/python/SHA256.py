@@ -1,7 +1,7 @@
 import hashlib
 
 
-def sha256sum(filename: str) -> str:
+def hash_file(filename: str) -> str:
     """
     Calculates the sha256 hash of the contents of [filename].
 
@@ -21,7 +21,7 @@ def sha256sum(filename: str) -> str:
     return h.hexdigest()
 
 
-def sha256sums(string: str) -> str:
+def hash_string(string: str) -> str:
     """
     Calculates the sha256 hash of [string].
 

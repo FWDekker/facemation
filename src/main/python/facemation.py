@@ -16,12 +16,12 @@ from natsort import natsorted
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 
+import Resolver
+import SHA256
 from Cache import ImageCache, NdarrayCache
 from ConfigHelper import load_config
-from HashHelper import sha256sum, sha256sums
 from ImageHelper import write_on_image
 from MathHelper import rotate, get_corners, largest_inner_rectangle, rectangle_overlap
-from ResourceHelper import resource_path
 from UserException import UserException
 
 Coords = np.ndarray  # x, y
@@ -41,7 +41,7 @@ def read_image_data(input_dir: str) -> Dict[str, MetaData]:
 
     pbar = tqdm(natsorted(glob.glob(f"{input_dir}/*.jpg")), desc="Reading image meta-data", file=sys.stdout)
     for image_path in pbar:
-        image_hash = sha256sum(image_path)
+        image_hash = SHA256.hash_file(image_path)
 
         image = Image.open(image_path)
         width, height = image.size
@@ -176,11 +176,11 @@ def normalize_images(imgs: Dict[str, MetaData],
     # Perform normalization
     pbar = tqdm(imgs.items(), desc="Normalizing images", file=sys.stdout)
     for img_path, img_data in pbar:
-        eye_hash = sha256sums(np.array2string(eyes[img_path]))
-        normalization_hash = sha256sums(np.array2string(np.hstack([scales[img_path],
-                                                                   translations[img_path],
-                                                                   angles[img_path],
-                                                                   min_inner_boundaries])))
+        eye_hash = SHA256.hash_string(np.array2string(eyes[img_path]))
+        normalization_hash = SHA256.hash_string(np.array2string(np.hstack([scales[img_path],
+                                                                           translations[img_path],
+                                                                           angles[img_path],
+                                                                           min_inner_boundaries])))
 
         # Skip if cached
         if normalized_cache.has(img_data["hash"], [eye_hash, normalization_hash]):
@@ -233,7 +233,7 @@ def add_captions(imgs: Dict[str, MetaData],
         caption = caption_generator(os.path.basename(img_path), Image.open(img_path))
 
         # TODO: Base cache key on hash of previous image
-        caption_hash = sha256sums(caption)
+        caption_hash = SHA256.hash_string(caption)
         if captioned_cache.has(img_data["hash"], [caption_hash]):
             continue
 
@@ -363,7 +363,6 @@ if __name__ == "__main__":
     # Create globals to reduce process communication
     cfg = load_config()
     detector = dlib.get_frontal_face_detector()
-    shape_predictor = dlib.shape_predictor(resource_path("shape_predictor_68_face_landmarks.dat"))
-
+    shape_predictor = dlib.shape_predictor(str(Resolver.resource_path("shape_predictor_68_face_landmarks.dat")))
     # Invoke main
     main()
