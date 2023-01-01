@@ -1,6 +1,3 @@
-from datetime import datetime
-
-
 # This file contains the default configuration. To change the configuration, override settings in the `config.py` file,
 # which must be in the same directory as the Facemation executable.
 
@@ -16,12 +13,6 @@ config = {
     "frames_dir": "output/frames/",
     # (Relative) directory to store created video in, relative to `frames_dir`.
     "output_path": "../facemation.mp4",
-
-    # Converts the filename of an image to the date on which it was taken.
-    # See also https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes
-    "filename_to_date": (lambda it: datetime.strptime("IMG_%Y%m%d_%H%M%S.jpg", it).date()),
-    # Converts the date of an image to an appropriate caption.
-    "date_to_caption": (lambda it: it.strftime("%Y-%m-%d")),
 
     # Determines which face should be used for normalization if an image contains multiple faces.
     #
@@ -48,12 +39,20 @@ config = {
         # Selects the face whose left edge is closest to the right of the image.
         f"example_left_right": (lambda it: -it.rect.left()),
         # Selects the face whose top edge is closest to y = 500.
-        f"example_top_500": (lambda it: abs(it.rect.top() - 500))},
+        f"example_top_500": (lambda it: abs(it.rect.top() - 500))
+    },
+
+    # Set to `True` to add a caption to each frame.
+    "caption_enabled": False,
+    # Given the image's filename and the `Image` object from the PIL library, generates the string caption to add to the
+    # image if `caption_enable` is `True`. See https://pillow.readthedocs.io/en/stable/reference/Image.html for more
+    # information on the `Image` object.
+    "caption_generator": (lambda filename, image: f"{filename}: {image.size}"),
 
     # Set to `True` to automatically run FFmpeg at the end.
     "ffmpeg_enabled": True,
     # The number of photos per second to show in the output video.
-    "ffmpeg_fps": "12",
+    "ffmpeg_fps": "48",
     # The codec to use for the output video. x264 is a very widely supported codec.
     "ffmpeg_codec": "libx264",
     # The "compression level" of the output video. A lower value means higher quality. Recommended between 18 and 28.
@@ -65,6 +64,6 @@ config = {
         # Pauses the last frame for 3 seconds at the end.
         "tpad=stop_mode=clone:stop_duration=3",
         # Morphs pictures into each other for a smoother transition effect.
-        "minterpolate=fps=30:mi_mode=blend",
+        "minterpolate=fps=60:mi_mode=blend",
     ],
 }

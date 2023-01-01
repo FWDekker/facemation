@@ -5,7 +5,6 @@ import os
 import shutil
 import subprocess
 import sys
-from datetime import date
 from pathlib import Path
 from typing import Callable, Dict, TypedDict, Tuple
 
@@ -217,34 +216,21 @@ def normalize_images(imgs: Dict[str, MetaData],
 def add_captions(imgs: Dict[str, MetaData],
                  input_cache: ImageCache,
                  captioned_cache: ImageCache,
-                 filename_to_date: Callable[[str], date],
-                 date_to_caption: Callable[[date], str]) -> None:
+                 caption_generator: Callable[[str, Image], str]) -> None:
     """
     For each image in [imgs], finds the corresponding image in [input_cache], and adds a caption using
-    [filename_to_date] and [date_to_caption], storing the captioned images in [captioned_cache].
-
-    Raises a [UserException] if [date_to_caption] raises an exception.
+    [caption_generator], storing the captioned images in [captioned_cache].
 
     :param imgs: the metadata of the images from which the normalized inputs are derived
     :param input_cache: the cache to read the images to caption from, with keys matching those in [imgs]
     :param captioned_cache: the cache to store captioned images in
-    :param filename_to_date: converts a filename to a [date]
-    :param date_to_caption: converts a [date] to a caption
+    :param caption_generator: converts the filename and PIL image data to a caption
     :return: `None`
     """
 
     pbar = tqdm(imgs.items(), desc="Adding captions", file=sys.stdout)
     for img_path, img_data in pbar:
-        img_name = os.path.basename(img_path)
-
-        try:
-            # TODO: Define `caption` as single function with access to all image metadata
-            caption = date_to_caption(filename_to_date(img_name))
-        except Exception as exception:
-            pbar.close()
-            raise UserException(f"Failed to convert date to caption for image '{img_name}'. "
-                                f"Your 'filename_to_date' has been configured wrongly. "
-                                f"Check your configuration for more details.", exception) from None
+        caption = caption_generator(os.path.basename(img_path), Image.open(img_path))
 
         # TODO: Base cache key on hash of previous image
         caption_hash = sha256sums(caption)
@@ -332,13 +318,24 @@ def main() -> None:
     # Validate requirements and inputs
     if cfg.ffmpeg_enabled and shutil.which("ffmpeg") is None:
         print(f"FFmpeg is enabled in your configuration but is not installed. "
-              f"Check the README for more information on the requirements.", file=sys.stderr)
+              f"Without FFmpeg, Facemation can create frames, but cannot produce a video. "
+              f"Install FFmpeg or disable FFmpeg in your configuration. "
+              f"Check the README for more information.", file=sys.stderr)
         return
 
-    if (not Path(cfg.input_dir).exists()) or len(glob.glob(f"{cfg.input_dir}/*.jpg")) == 0:
+    # TODO: Support inputs other than JPG
+    jpg_input_count = len(glob.glob(f"{cfg.input_dir}/*.jpg"))
+    all_input_count = len(glob.glob(f"{cfg.input_dir}/*.*"))
+    if jpg_input_count == 0:
         print(f"No images detected in '{Path(cfg.input_dir).absolute()}'. "
               f"Are you sure you put them in the right place?",
               file=sys.stderr)
+        return
+    if jpg_input_count != all_input_count:
+        print(f"Found {all_input_count - jpg_input_count} image(s) with an extension other than .jpg in "
+              f"'{Path(cfg.input_dir).absolute()}'. "
+              f"Non-JPG images are not supported by Facemation. "
+              f"Remove all files with an extension other than .jpg from the input folder.")
         return
 
     # Run facemation
@@ -350,8 +347,11 @@ def main() -> None:
         imgs = read_image_data(cfg.input_dir)
         find_all_faces(imgs, face_cache, cfg.error_dir)
         normalize_images(imgs, face_cache, normalized_cache)
-        add_captions(imgs, normalized_cache, captioned_cache, cfg.filename_to_date, cfg.date_to_caption)
-        demux_images(cfg.ffmpeg_enabled, imgs, captioned_cache, cfg.frames_dir, cfg.output_path, cfg.ffmpeg_fps,
+        if cfg.caption_enabled:
+            add_captions(imgs, normalized_cache, captioned_cache, cfg.caption_generator)
+
+        demux_input_cache = captioned_cache if cfg.caption_enabled else normalized_cache
+        demux_images(cfg.ffmpeg_enabled, imgs, demux_input_cache, cfg.frames_dir, cfg.output_path, cfg.ffmpeg_fps,
                      cfg.ffmpeg_crf, cfg.ffmpeg_codec, cfg.ffmpeg_video_filters)
 
         print("Done!")

@@ -12,6 +12,7 @@ compiles these frames into a timelapse.
 2. [Download the latest version of Facemation.](https://github.com/FWDekker/facemation/releases/latest)
    Unzip the downloaded archive.
 3. Put your images in the `input/` folder.
+   Currently, only `.jpg`s are supported.
    Files are processed in [natural sort order](https://en.wikipedia.org/wiki/Natural_sort_order).
 4. (_Optional_) Configure Facemation by editing `config.py`.
    Check [`config_default.py`](https://github.com/FWDekker/facemation/blob/master/src/main/python/config_default.py) for
