@@ -1,10 +1,11 @@
 from importlib.machinery import SourceFileLoader
+from typing import Any
 
 from mergedeep import merge
 
 import Resolver
 
-FacemationConfig = any
+FacemationConfig = Any
 
 
 def load_config() -> FacemationConfig:

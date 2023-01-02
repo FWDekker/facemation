@@ -1,48 +1,65 @@
 import math
 import os
 import sys
-from typing import Dict, Callable
+from typing import Dict, Callable, Any
 
 import cv2
 import numpy as np
 from PIL import Image
+from numpy import ndarray
 from tqdm import tqdm
 
-import SHA256
+import Hasher
 from Cache import ImageCache
-from stages.ReadInputsStage import ImageMetadata
+from Pipeline import PostprocessingStage, Images
 
 
-def add_captions(imgs: Dict[str, ImageMetadata],
-                 input_cache: ImageCache,
-                 captioned_cache: ImageCache,
-                 caption_generator: Callable[[str, Image], str]) -> None:
-    """
-    For each image in [imgs], finds the corresponding image in [input_cache], and adds a caption using
-    [caption_generator], storing the captioned images in [captioned_cache].
+class CaptionStage(PostprocessingStage):
+    """Adds a caption to each image."""
 
-    :param imgs: the metadata of the images from which the normalized inputs are derived
-    :param input_cache: the cache to read the images to caption from, with keys matching those in [imgs]
-    :param captioned_cache: the cache to store captioned images in
-    :param caption_generator: converts the filename and PIL image data to a caption
-    :return: `None`
-    """
+    """The cache to store captioned images in."""
+    captioned_cache: ImageCache
+    """Generates a caption based on the filename and PIL `Image` object."""
+    caption_generator: Callable[[str, Any], str]
 
-    pbar = tqdm(imgs.items(), desc="Adding captions", file=sys.stdout)
-    for img_path, img_data in pbar:
-        caption = caption_generator(os.path.basename(img_path), Image.open(img_path))
+    def __init__(self, cache_dir: str, caption_generator: Callable[[str, Image], str]):
+        """
+        Constructs a new [CaptionStage].
 
-        # TODO: Base cache key on hash of previous image
-        caption_hash = SHA256.hash_string(caption)
-        if captioned_cache.has(img_data["hash"], [caption_hash]):
-            continue
+        :param cache_dir: the directory to cache captioned images in
+        :param caption_generator: generates a caption based on the filename and PIL `Image` object
+        """
 
-        img = input_cache.load_any(img_data["hash"])
-        img = _write_on_image(img, caption, (0.05, 0.95), 0.05)
-        captioned_cache.cache(img_data["hash"], [caption_hash], img)
+        self.captioned_cache = ImageCache(cache_dir, "captioned", ".jpg")
+        self.caption_generator = caption_generator
+
+    def postprocess(self, imgs: Images, input_cache: ImageCache) -> ImageCache:
+        """
+        For each image in [imgs], finds the corresponding image in [input_cache], and adds a caption using
+        [self.caption_generator], storing the captioned images in [self.captioned_cache].
+
+        :param imgs: the metadata of the images from which the normalized inputs are derived
+        :param input_cache: the cache to read the images to caption from, with keys matching those in [imgs]
+        :return: [self.captioned_cache]
+        """
+
+        pbar = tqdm(imgs.items(), desc="Adding captions", file=sys.stdout)
+        for img_path, img_data in pbar:
+            caption = self.caption_generator(os.path.basename(img_path), Image.open(img_path))
+
+            img_hash = input_cache.get_path_any(img_data["hash"])
+            args_hash = Hasher.hash_string(f"{img_hash}{caption}")
+            if self.captioned_cache.has(img_data["hash"], args_hash):
+                continue
+
+            img = input_cache.load_any(img_data["hash"])
+            img = write_on_image(img, caption, (0.05, 0.95), 0.05)
+            self.captioned_cache.cache(img_data["hash"], args_hash, img)
+
+        return self.captioned_cache
 
 
-def _write_on_image(image: np.ndarray, text: str, pos: [float, float], text_height: float) -> np.ndarray:
+def write_on_image(image: np.ndarray, text: str, pos: [float, float], text_height: float) -> np.ndarray:
     """
     Writes [text] on [image] at coordinates [pos] with a height of [text_height].
 

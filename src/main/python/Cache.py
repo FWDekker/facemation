@@ -2,17 +2,21 @@ import glob
 import pickle
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, TypeVar, Generic
+from typing import TypeVar, Generic
 
 import cv2
 import numpy as np
 
+import Files
+from UserException import UserException
+
 T = TypeVar("T")
 
 
+# TODO: Store `args` separately in a `<file>.args` file, and check that file to see if there's a match
 class Cache(ABC, Generic[T]):
     """
-    Stores data identified by a key, associated with args that identify whether the file is up-to-date.
+    Stores data identified by a key, associated with serialized args that identify whether the file is up-to-date.
     """
     directory: str
     prefix: str
@@ -26,18 +30,18 @@ class Cache(ABC, Generic[T]):
         :param prefix: the string to prefix all cached files with
         :param suffix: the string to suffix all cached files with
         """
-        Path(directory).mkdir(exist_ok=True)
+        Files.mkdir(directory)
 
         self.directory = directory
         self.prefix = prefix
         self.suffix = suffix
 
-    def has(self, key: str, args: List[str]) -> bool:
+    def has(self, key: str, args: str) -> bool:
         """
         Returns `True` if and only if a file with [key] and [args] has been stored.
 
         :param key: the key to search for
-        :param args: the args to search for
+        :param args: the serialized args to search for
         :return: `True` if and only if a file with [key] and [args] has been stored.
         """
         return Path(self.get_path(key, args)).exists()
@@ -53,12 +57,12 @@ class Cache(ABC, Generic[T]):
         paths = glob.glob(self.get_glob(key))
         return len(paths) > 0
 
-    def load(self, key: str, args: List[str]) -> T:
+    def load(self, key: str, args: str) -> T:
         """
         Returns the cached data associated with [key] and [args].
 
         :param key: the key to load data for
-        :param args: the args to load data for
+        :param args: the serialized args to load data for
         :return: the cached data associated with [key] and [args]
         """
 
@@ -73,7 +77,7 @@ class Cache(ABC, Generic[T]):
         """
         Returns any cached data associated with [key], regardless of `args`.
 
-        Throws an [Exception] if no data has been cached under [key].
+        Raises a [UserException] if no data has been cached under [key].
 
         :param key: the key to load data for
         :return: any cached data associated with [key], regardless of `args`
@@ -81,12 +85,12 @@ class Cache(ABC, Generic[T]):
 
         return self._read_data(self.get_path_any(key))
 
-    def cache(self, key: str, args: List[str], data: T) -> None:
+    def cache(self, key: str, args: str, data: T) -> None:
         """
         Caches [data] under [key] and [args], and removes all other data cached under [key].
 
         :param key: the key to cache [data] under
-        :param args: the args to cache [data] under
+        :param args: the serialized args to cache [data] under
         :param data: the data to cache
         :return: `None`
         """
@@ -97,18 +101,18 @@ class Cache(ABC, Generic[T]):
         path = self.get_path(key, args)
         self._write_data(path, data)
 
-    def get_path(self, key: str, args: List[str]) -> str:
+    def get_path(self, key: str, args: str = "") -> str:
         """
         Returns the path to the data cached under [key] and [args].
 
         :param key: the key to search for
-        :param args: the args to search for
+        :param args: the serialized args to search for
         :return: the path to the data cached under [key] and [args]
         """
 
         path = f"{self.directory}/{self.prefix}-{key}"
         if len(args) > 0:
-            path += "-".join(args)
+            path += f"-{args}"
         path += self.suffix
         return path
 
@@ -116,7 +120,7 @@ class Cache(ABC, Generic[T]):
         """
         Returns the path to any data cached under [key] and any args.
 
-        Throws an [Exception] if no data has been cached under [key].
+        Raises a [UserException] if no data has been cached under [key].
 
         :param key: the key to search for
         :return: the path to any data cached under [key] and any args
@@ -124,7 +128,7 @@ class Cache(ABC, Generic[T]):
 
         paths = glob.glob(self.get_glob(key))
         if len(paths) == 0:
-            raise Exception(f"Expected exactly 1 cached result for '{self.prefix}', but found 0.")
+            raise UserException(f"Expected exactly 1 cached result for '{self.prefix}-{key}', but found 0.")
 
         return paths[0]
 
@@ -168,6 +172,7 @@ class ImageCache(Cache[np.ndarray]):
     """
 
     def _write_data(self, path: str, data: np.ndarray) -> None:
+        # TODO: Detect write failures (when returns `False`?)
         cv2.imwrite(path, data)
 
     def _read_data(self, path: str) -> np.ndarray:

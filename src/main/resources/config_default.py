@@ -1,16 +1,18 @@
 # This file contains the default configuration. To change the configuration, override settings in the `config.py` file,
 # which must be in the same directory as the Facemation executable.
 config = {
-    # (Relative) directory to find the original frames in.
-    "input_dir": "input/",
-    # (Relative) directory to store images in that caused an error.
-    "error_dir": "output/error/",
-    # (Relative) directory to cache intermediate results in.
-    "cache_dir": "output/cache/",
-    # (Relative) directory to store final frames in.
-    "frames_dir": "output/frames/",
-    # (Relative) directory to store created video in, relative to `frames_dir`.
-    "output_path": "../facemation.mp4",
+    "paths": {
+        # Directory with the original images to process and turn into a video.
+        "input": "input/",
+        # Directory to cache intermediate results in to speed up future runs.
+        "cache": "output/cache/",
+        # Directory to store images in that caused an error.
+        "error": "output/error/",
+        # Directory to store final frames in.
+        "frames": "output/frames/",
+        # Directory to store created video in, relative to `frames`.
+        "output": "../facemation.mp4",
+    },
 
     # Determines which face should be used for normalization if an image contains multiple faces.
     #
@@ -23,7 +25,7 @@ config = {
     # The easiest way to configure overrides is based on the position of the face, as shown in the default examples
     # below. To find which face you need, first run the main script, and once it fails because it has detected multiple
     # faces, check the image in the `error_dir` directory and add an appropriate override function.
-    "face_selection_override": {
+    "face_selection_overrides": {
         # Selects the face whose top edge is closest to the top of the image.
         f"example_top_top.jpg": (lambda it: it.rect.top()),
         # Selects the face whose bottom edge is closest to the top of the image.
@@ -35,7 +37,7 @@ config = {
         # Selects the face whose left edge is closest to the right of the image.
         f"example_left_right.jpg": (lambda it: -it.rect.left()),
         # Selects the face whose top edge is closest to y = 500.
-        f"example_top_500.jpg": (lambda it: abs(it.rect.top() - 500))
+        f"example_top_500.jpg": (lambda it: abs(it.rect.top() - 500)),
     },
 
     # Add text into the processed frames.
