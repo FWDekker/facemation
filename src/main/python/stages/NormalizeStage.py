@@ -15,12 +15,11 @@ from UserException import UserException
 class NormalizeStage(ProcessingStage):
     """Normalizes input images."""
 
-    """The cache to store normalized images in."""
     normalized_cache: ImageCache
 
     def __init__(self, cache_dir: str):
         """
-        Constructs a new [NormalizeStage].
+        Constructs a new `NormalizeStage`.
 
         :param cache_dir: the directory to store normalized images in
         """
@@ -70,15 +69,15 @@ class NormalizeStage(ProcessingStage):
         pbar = tqdm(imgs.items(), desc="Normalizing images", file=sys.stdout)
         for img_path, img_data in pbar:
             eyes_string = np.array2string(eyes[img_path])
-            normal_params_string = np.array2string(np.hstack([scales[img_path],
-                                                              translations[img_path],
-                                                              angles[img_path],
-                                                              min_inner_boundaries]))
-            args_hash = Hasher.hash_string(f"{eyes_string}-{normal_params_string}")
+            params_string = np.array2string(np.hstack([scales[img_path],
+                                                       translations[img_path],
+                                                       angles[img_path],
+                                                       min_inner_boundaries]))
 
             # Skip if cached
-            if self.normalized_cache.has(img_data["hash"], args_hash):
-                output_paths[img_path] = self.normalized_cache.get_path(img_data["hash"], args_hash)
+            state_hash = Hasher.hash_string(f"{eyes_string}-{params_string}")
+            if self.normalized_cache.has(img_data["hash"], state_hash):
+                output_paths[img_path] = self.normalized_cache.path(img_data["hash"], state_hash)
                 continue
 
             # Read image
@@ -107,8 +106,7 @@ class NormalizeStage(ProcessingStage):
             img = img[min_inner_boundaries[1]:min_inner_boundaries[3], min_inner_boundaries[0]:min_inner_boundaries[2]]
 
             # Store normalized image
-            self.normalized_cache.cache(img_data["hash"], args_hash, img)
-            output_paths[img_path] = self.normalized_cache.get_path(img_data["hash"], args_hash)
+            output_paths[img_path] = self.normalized_cache.cache(img, img_data["hash"], state_hash)
 
         return output_paths
 

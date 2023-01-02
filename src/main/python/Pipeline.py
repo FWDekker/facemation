@@ -96,7 +96,7 @@ class Pipeline:
 
     def __init__(self):
         """
-        Constructs a new [Pipeline].
+        Constructs a new `Pipeline`.
         """
 
         self.preprocessing = []

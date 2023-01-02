@@ -9,6 +9,10 @@ from Pipeline import PreprocessingStage, Images
 
 
 class ReadMetadataStage(PreprocessingStage):
+    """
+    Reads simple image metadata.
+    """
+
     def preprocess(self, imgs: Images) -> Images:
         """
         Reads image hash and dimensions as image metadata.

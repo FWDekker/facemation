@@ -2,22 +2,24 @@ import glob
 import pickle
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TypeVar, Generic
+from typing import TypeVar, Generic, List
 
 import cv2
 import numpy as np
 
 import Files
-from UserException import UserException
 
 T = TypeVar("T")
 
 
-# TODO: Store `args` separately in a `<file>.args` file, and check that file to see if there's a match
 class Cache(ABC, Generic[T]):
     """
-    Stores data identified by a key, associated with serialized args that identify whether the file is up-to-date.
+    Stores data identified by a key, associated with a state that identifies the contents of the datum.
+
+    Only a single datum can be stored under any given key. If a datum is stored under a used key, the existing datum and
+    its state are overwritten.
     """
+
     directory: str
     prefix: str
     suffix: str
@@ -36,111 +38,75 @@ class Cache(ABC, Generic[T]):
         self.prefix = prefix
         self.suffix = suffix
 
-    def has(self, key: str, args: str) -> bool:
+    def path(self, key: str, state: str) -> str:
         """
-        Returns `True` if and only if a file with [key] and [args] has been stored.
+        Returns the path to the data cached under [key] and [state].
 
         :param key: the key to search for
-        :param args: the serialized args to search for
-        :return: `True` if and only if a file with [key] and [args] has been stored.
+        :param state: the state to search for
+        :return: the path to the data cached under [key] and [state]
         """
-        return Path(self.get_path(key, args)).exists()
 
-    def has_any(self, key: str) -> bool:
+        return f"{self.directory}/{self.prefix}-{key}-{state}{self.suffix}"
+
+    def path_all(self, key: str) -> List[str]:
         """
-        Returns `True` if and only if any data with [key] and any args has been cached.
+        Returns all paths to data cached under [key] and any state.
 
         :param key: the key to search for
-        :return: `True` if and only if any data with [key] and any args has been cached
+        :return: all paths to data cached under [key] and any state
         """
 
-        paths = glob.glob(self.get_glob(key))
-        return len(paths) > 0
+        return glob.glob(f"{self.directory}/{self.prefix}-{key}*{self.suffix}")
 
-    def load(self, key: str, args: str) -> T:
+    def has(self, key: str, state: str = "") -> bool:
         """
-        Returns the cached data associated with [key] and [args].
+        Returns `True` if and only if a datum with [key] and [state] has been stored.
+
+        :param key: the key to search for
+        :param state: the state to search for
+        :return: `True` if and only if a datum with [key] and [state] has been stored.
+        """
+
+        return Path(self.path(key, state)).exists()
+
+    def load(self, key: str, state: str = "") -> T:
+        """
+        Returns the cached data associated with [key] and [state].
 
         :param key: the key to load data for
-        :param args: the serialized args to load data for
-        :return: the cached data associated with [key] and [args]
+        :param state: the state to load data for
+        :return: the cached data associated with [key] and [state]
         """
 
-        path = self.get_path(key, args)
-
+        path = self.path(key, state)
         if not Path(path).exists():
             raise Exception(f"Tried to load '{path}' from cache '{self.prefix}', but no such file exists.")
 
         return self._read_data(path)
 
-    def load_any(self, key: str) -> T:
+    def cache(self, data: T, key: str, state: str = "") -> str:
         """
-        Returns any cached data associated with [key], regardless of `args`.
+        Removes all other data cached under [key], and caches [data] under [key] and [state].
 
-        Raises a [UserException] if no data has been cached under [key].
-
-        :param key: the key to load data for
-        :return: any cached data associated with [key], regardless of `args`
-        """
-
-        return self._read_data(self.get_path_any(key))
-
-    def cache(self, key: str, args: str, data: T) -> None:
-        """
-        Caches [data] under [key] and [args], and removes all other data cached under [key].
-
-        :param key: the key to cache [data] under
-        :param args: the serialized args to cache [data] under
         :param data: the data to cache
-        :return: `None`
+        :param key: the key to cache [data] under
+        :param state: the state to cache [data] under
+        :return: the path under which [data] has been stored
         """
 
-        for file in glob.glob(self.get_glob(key)):
+        if "-" in key:
+            raise Exception(f"Key must not contain '-', but was '{key}'.")
+        if "-" in state:
+            raise Exception(f"State must not contain '-', but was '{state}'.")
+
+        for file in self.path_all(key):
             Path(file).unlink()
 
-        path = self.get_path(key, args)
+        path = self.path(key, state)
         self._write_data(path, data)
 
-    def get_path(self, key: str, args: str = "") -> str:
-        """
-        Returns the path to the data cached under [key] and [args].
-
-        :param key: the key to search for
-        :param args: the serialized args to search for
-        :return: the path to the data cached under [key] and [args]
-        """
-
-        path = f"{self.directory}/{self.prefix}-{key}"
-        if len(args) > 0:
-            path += f"-{args}"
-        path += self.suffix
         return path
-
-    def get_path_any(self, key: str) -> str:
-        """
-        Returns the path to any data cached under [key] and any args.
-
-        Raises a [UserException] if no data has been cached under [key].
-
-        :param key: the key to search for
-        :return: the path to any data cached under [key] and any args
-        """
-
-        paths = glob.glob(self.get_glob(key))
-        if len(paths) == 0:
-            raise UserException(f"Expected exactly 1 cached result for '{self.prefix}-{key}', but found 0.")
-
-        return paths[0]
-
-    def get_glob(self, key: str) -> str:
-        """
-        Returns the glob pattern that matches all data cached under [key].
-
-        :param key: the key to search for
-        :return: the glob pattern that matches all data cached under [key]
-        """
-
-        return f"{self.directory}/{self.prefix}-{key}*{self.suffix}"
 
     @abstractmethod
     def _write_data(self, path: str, data: T) -> None:

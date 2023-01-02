@@ -31,17 +31,13 @@ class FindFacesStage(PreprocessingStage):
     Finds faces in the input images.
     """
 
-    """The directory to store annotated faces in with no or multiple faces and no appropriate
-    [FaceSelectionOverride]."""
     error_dir: str
-    """The cache to store detected [Face]s in."""
     face_cache: NdarrayCache
-    """Determines which face to select in an image with multiple faces."""
     face_selection_overrides: Dict[str, Callable[[full_object_detection], int]]
 
     def __init__(self, cache_dir: str, error_dir: str, face_selection_overrides: Dict[str, FaceSelectionOverride]):
         """
-        Constructs a new [FindFacesStage].
+        Constructs a new `FindFacesStage`.
 
         :param cache_dir: the directory to cache found faces in
         :param error_dir: the directory to write debugging information in to assist the user
@@ -92,8 +88,8 @@ def find_face(img: Tuple[str, ImageData], face_cache: NdarrayCache, error_dir: s
     """
 
     img_path, img_data = img
-    if face_cache.has(img_data["hash"], ""):
-        return img_path, {"eyes": face_cache.load(img_data["hash"], "")}
+    if face_cache.has(img_data["hash"]):
+        return img_path, {"eyes": face_cache.load(img_data["hash"])}
 
     # Initialize face recognition
     global g_face_selection_overrides
@@ -136,6 +132,6 @@ def find_face(img: Tuple[str, ImageData], face_cache: NdarrayCache, error_dir: s
     # Store results
     eyes = np.vstack([(np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(36, 42)]), axis=0)),
                       (np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(42, 48)]), axis=0))])
-    face_cache.cache(img_data["hash"], "", eyes)
+    face_cache.cache(eyes, img_data["hash"])
 
     return img_path, {"eyes": eyes}

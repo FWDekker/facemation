@@ -16,14 +16,12 @@ from Pipeline import Images, ProcessingStage
 class CaptionStage(ProcessingStage):
     """Adds a caption to each image."""
 
-    """The cache to store captioned images in."""
     captioned_cache: ImageCache
-    """Generates a caption based on the filename and PIL `Image` object."""
     caption_generator: Callable[[str, Any], str]
 
     def __init__(self, cache_dir: str, caption_generator: Callable[[str, Image], str]):
         """
-        Constructs a new [CaptionStage].
+        Constructs a new `CaptionStage`.
 
         :param cache_dir: the directory to cache captioned images in
         :param caption_generator: generates a caption based on the filename and PIL `Image` object
@@ -43,19 +41,19 @@ class CaptionStage(ProcessingStage):
         """
 
         output_paths = {}
+
         for img_path, img_data in tqdm(imgs.items(), desc="Adding captions", file=sys.stdout):
             caption = self.caption_generator(os.path.basename(img_path), Image.open(img_path))
 
-            args_hash = Hasher.hash_string(f"{input_paths[img_path]}{caption}")
-            if self.captioned_cache.has(img_data["hash"], args_hash):
-                output_paths[img_path] = self.captioned_cache.get_path(img_data["hash"], args_hash)
+            state_hash = Hasher.hash_string(f"{input_paths[img_path]}-{caption}")
+            if self.captioned_cache.has(img_data["hash"], state_hash):
+                output_paths[img_path] = self.captioned_cache.path(img_data["hash"], state_hash)
                 continue
 
             img = cv2.imread(input_paths[img_path])
             img = write_on_image(img, caption, (0.05, 0.95), 0.05)
 
-            self.captioned_cache.cache(img_data["hash"], args_hash, img)
-            output_paths[img_path] = self.captioned_cache.get_path(img_data["hash"], args_hash)
+            output_paths[img_path] = self.captioned_cache.cache(img, img_data["hash"], state_hash)
 
         return output_paths
 
@@ -74,7 +72,7 @@ def write_on_image(image: np.ndarray, text: str, pos: [float, float], text_heigh
     height, width = image.shape[:2]
     text_scale = cv2.getTextSize(text, fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=1, thickness=32)
     text_scale = text_height / (text_scale[0][1] / height)
-    text_pos = (math.floor(pos[0] * width), math.floor(pos[1] * height))
+    text_pos = math.floor(pos[0] * width), math.floor(pos[1] * height)
 
     image = cv2.putText(image, text, text_pos,
                         fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=text_scale,

@@ -15,8 +15,8 @@ compiles these frames into a timelapse.
    Currently, only `.jpg`s are supported.
    Files are processed in [natural sort order](https://en.wikipedia.org/wiki/Natural_sort_order).
 4. (_Optional_) Configure Facemation by editing `config.py`.
-   Check [`config_default.py`](https://github.com/FWDekker/facemation/blob/master/src/main/python/config_default.py) for
-   a list of all options.
+   Check [`config_default.py`](https://github.com/FWDekker/facemation/blob/master/src/main/resources/config_default.py)
+   for a list of all options.
 5. Run the downloaded Facemation executable.
 6. Check the output and adjust the configuration as desired.
    All intermediate results are heavily cached, so subsequent runs are much faster.

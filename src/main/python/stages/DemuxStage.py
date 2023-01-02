@@ -13,14 +13,12 @@ class DemuxStage(PostprocessingStage):
     Demuxes the processed frames into a video.
     """
 
-    """The directory to store the video in."""
     output_path: str
-    """The configuration for the demuxer."""
     cfg: FacemationConfig
 
     def __init__(self, output_path: str, cfg: FacemationConfig):
         """
-        Constructs a new [DemuxStage].
+        Constructs a new `DemuxStage`.
 
         Raises a [UserException] if this stage is enabled but FFmpeg is not installed.
 
