@@ -1,10 +1,12 @@
 import shutil
 import subprocess
 import sys
+from pathlib import Path
+from typing import Dict
 
 import Files
 from Config import FacemationConfig
-from Pipeline import PostprocessingStage, Images
+from Pipeline import PostprocessingStage, ImageInfo
 from UserException import UserException
 
 
@@ -37,12 +39,13 @@ class DemuxStage(PostprocessingStage):
                                 f"Install FFmpeg or disable FFmpeg in your configuration. "
                                 f"Check the README for more information.")
 
-    def postprocess(self, imgs: Images, frames_dir: str) -> None:
+    def postprocess(self, imgs: Dict[Path, ImageInfo], frames_dir: str) -> None:
         """
         Demuxes the images in [frames_dir] into a video in [self.output_path] using FFmpeg, subject to [self.cfg].
 
-        :param imgs: a read-only mapping from input image paths to their pre-processed data
-        :param frames_dir: the directory containing processed images
+        :param imgs: a read-only mapping from original input paths to the preprocessed data and the processed output
+        path
+        :param frames_dir: the directory containing exactly all processed images
         :return: `None`
         """
 

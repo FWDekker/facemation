@@ -1,11 +1,13 @@
 import sys
+from pathlib import Path
+from typing import Dict
 
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
 import Hasher
-from Pipeline import PreprocessingStage, Images
+from Pipeline import PreprocessingStage, ImageInfo
 
 
 class ReadMetadataStage(PreprocessingStage):
@@ -13,12 +15,12 @@ class ReadMetadataStage(PreprocessingStage):
     Reads simple image metadata.
     """
 
-    def preprocess(self, imgs: Images) -> Images:
+    def preprocess(self, imgs: Dict[Path, ImageInfo]) -> Dict[Path, ImageInfo]:
         """
         Reads image hash and dimensions as image metadata.
 
-        :param imgs: the paths to the input images
-        :return: a mapping from file paths to the hash of the image and the dimensions of the image
+        :param imgs: a read-only mapping from original input paths to the preprocessed data obtained thus far
+        :return: a mapping from original input path to the hash and dimensions of the image
         """
 
         metadata = {}

@@ -1,6 +1,7 @@
+import copy
 import math
-import os
 import sys
+from pathlib import Path
 from typing import Callable, Any, Dict
 
 import cv2
@@ -10,11 +11,13 @@ from tqdm import tqdm
 
 import Hasher
 from Cache import ImageCache
-from Pipeline import Images, ProcessingStage
+from Pipeline import ImageInfo, ProcessingStage
 
 
 class CaptionStage(ProcessingStage):
-    """Adds a caption to each image."""
+    """
+    Adds a caption to each image.
+    """
 
     captioned_cache: ImageCache
     caption_generator: Callable[[str, Any], str]
@@ -30,32 +33,31 @@ class CaptionStage(ProcessingStage):
         self.captioned_cache = ImageCache(cache_dir, "captioned", ".jpg")
         self.caption_generator = caption_generator
 
-    def process(self, imgs: Images, input_paths: Dict[str, str]) -> Dict[str, str]:
+    def process(self, imgs: Dict[Path, ImageInfo]) -> Dict[Path, ImageInfo]:
         """
-        For each image in [imgs], finds the corresponding image in [input_paths], and adds a caption using
-        [self.caption_generator], storing the captioned images in the returned paths.
+        Captions all [imgs] using [self.caption_generator], storing the results in [self.captioned_cache].
 
-        :param imgs: a read-only mapping from input image paths to their pre-processed data
-        :param input_paths: a read-only mapping from input image paths to (partially) processed image paths
-        :return: a mapping from input image paths to processed image paths
+        :param imgs: a read-only mapping from original input paths to the preprocessed data and the processed input path
+        :return: a copy of [imgs] with `"processed_path"` pointing to the newly processed images
         """
 
-        output_paths = {}
+        processed_imgs = copy.deepcopy(imgs)
 
         for img_path, img_data in tqdm(imgs.items(), desc="Adding captions", file=sys.stdout):
-            caption = self.caption_generator(os.path.basename(img_path), Image.open(img_path))
+            caption = self.caption_generator(img_path.name, Image.open(img_path))
 
-            state_hash = Hasher.hash_string(f"{input_paths[img_path]}-{caption}")
+            processed_img_hash = Hasher.hash_file(img_data["processed_path"])
+            state_hash = Hasher.hash_string(f"{processed_img_hash}-{caption}")
             if self.captioned_cache.has(img_data["hash"], state_hash):
-                output_paths[img_path] = self.captioned_cache.path(img_data["hash"], state_hash)
+                processed_imgs[img_path]["processed_path"] = self.captioned_cache.path(img_data["hash"], state_hash)
                 continue
 
-            img = cv2.imread(input_paths[img_path])
+            img = cv2.imread(str(img_data["processed_path"]))
             img = write_on_image(img, caption, (0.05, 0.95), 0.05)
 
-            output_paths[img_path] = self.captioned_cache.cache(img, img_data["hash"], state_hash)
+            processed_imgs[img_path]["processed_path"] = self.captioned_cache.cache(img, img_data["hash"], state_hash)
 
-        return output_paths
+        return processed_imgs
 
 
 def write_on_image(image: np.ndarray, text: str, pos: [float, float], text_height: float) -> np.ndarray:

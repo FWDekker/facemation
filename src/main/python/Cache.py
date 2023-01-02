@@ -9,9 +9,11 @@ import numpy as np
 
 import Files
 
+"""The type of data stored in a cache."""
 T = TypeVar("T")
 
 
+# TODO: Keep track of `state`s in an index file, to prevent overly long filenames
 class Cache(ABC, Generic[T]):
     """
     Stores data identified by a key, associated with a state that identifies the contents of the datum.
@@ -32,13 +34,14 @@ class Cache(ABC, Generic[T]):
         :param prefix: the string to prefix all cached files with
         :param suffix: the string to suffix all cached files with
         """
+
         Files.mkdir(directory)
 
         self.directory = directory
         self.prefix = prefix
         self.suffix = suffix
 
-    def path(self, key: str, state: str) -> str:
+    def path(self, key: str, state: str) -> Path:
         """
         Returns the path to the data cached under [key] and [state].
 
@@ -47,9 +50,9 @@ class Cache(ABC, Generic[T]):
         :return: the path to the data cached under [key] and [state]
         """
 
-        return f"{self.directory}/{self.prefix}-{key}-{state}{self.suffix}"
+        return Path(f"{self.directory}/{self.prefix}-{key}-{state}{self.suffix}")
 
-    def path_all(self, key: str) -> List[str]:
+    def path_all(self, key: str) -> List[Path]:
         """
         Returns all paths to data cached under [key] and any state.
 
@@ -57,7 +60,7 @@ class Cache(ABC, Generic[T]):
         :return: all paths to data cached under [key] and any state
         """
 
-        return glob.glob(f"{self.directory}/{self.prefix}-{key}*{self.suffix}")
+        return [Path(it) for it in glob.glob(f"{self.directory}/{self.prefix}-{key}*{self.suffix}")]
 
     def has(self, key: str, state: str = "") -> bool:
         """
@@ -68,7 +71,7 @@ class Cache(ABC, Generic[T]):
         :return: `True` if and only if a datum with [key] and [state] has been stored.
         """
 
-        return Path(self.path(key, state)).exists()
+        return self.path(key, state).exists()
 
     def load(self, key: str, state: str = "") -> T:
         """
@@ -80,12 +83,12 @@ class Cache(ABC, Generic[T]):
         """
 
         path = self.path(key, state)
-        if not Path(path).exists():
+        if not path.exists():
             raise Exception(f"Tried to load '{path}' from cache '{self.prefix}', but no such file exists.")
 
         return self._read_data(path)
 
-    def cache(self, data: T, key: str, state: str = "") -> str:
+    def cache(self, data: T, key: str, state: str = "") -> Path:
         """
         Removes all other data cached under [key], and caches [data] under [key] and [state].
 
@@ -100,8 +103,8 @@ class Cache(ABC, Generic[T]):
         if "-" in state:
             raise Exception(f"State must not contain '-', but was '{state}'.")
 
-        for file in self.path_all(key):
-            Path(file).unlink()
+        for path in self.path_all(key):
+            path.unlink()
 
         path = self.path(key, state)
         self._write_data(path, data)
@@ -109,9 +112,9 @@ class Cache(ABC, Generic[T]):
         return path
 
     @abstractmethod
-    def _write_data(self, path: str, data: T) -> None:
+    def _write_data(self, path: Path, data: T) -> None:
         """
-        Serializes and writes [data] to the file at [path].
+        Serializes and writes [data] to [path].
 
         :param path: the path to write [data] to
         :param data: the data to write to [path]
@@ -121,12 +124,12 @@ class Cache(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    def _read_data(self, path: str) -> T:
+    def _read_data(self, path: Path) -> T:
         """
-        Reads data from the file at [path] and returns the deserialized value.
+        Reads data from [path] and returns the deserialized value.
 
         :param path: the path to read data from
-        :return: the deserialized data read from the file at [path]
+        :return: the deserialized data read from [path]
         """
 
         pass
@@ -137,12 +140,11 @@ class ImageCache(Cache[np.ndarray]):
     Caches images from the CV2 library.
     """
 
-    def _write_data(self, path: str, data: np.ndarray) -> None:
-        # TODO: Detect write failures (when returns `False`?)
-        cv2.imwrite(path, data)
+    def _write_data(self, path: Path, data: np.ndarray) -> None:
+        cv2.imwrite(str(path), data)
 
-    def _read_data(self, path: str) -> np.ndarray:
-        return cv2.imread(path)
+    def _read_data(self, path: Path) -> np.ndarray:
+        return cv2.imread(str(path))
 
 
 class NdarrayCache(Cache[np.ndarray]):
@@ -150,10 +152,10 @@ class NdarrayCache(Cache[np.ndarray]):
     Caches arbitrary Numpy arrays.
     """
 
-    def _write_data(self, path: str, data: np.ndarray) -> None:
+    def _write_data(self, path: Path, data: np.ndarray) -> None:
         with open(path, "wb") as file:
             pickle.dump(data, file, protocol=pickle.HIGHEST_PROTOCOL)
 
-    def _read_data(self, path: str) -> np.ndarray:
+    def _read_data(self, path: Path) -> np.ndarray:
         with open(path, "rb") as file:
             return pickle.load(file)

@@ -7,17 +7,15 @@ from typing import Dict, Tuple, Callable
 import cv2
 import dlib
 import numpy as np
-from _dlib_pybind11 import full_object_detection
 from tqdm.contrib.concurrent import process_map
 
 import Files
 import Resolver
 from Cache import NdarrayCache
-from Pipeline import PreprocessingStage, Images, ImageData
+from Pipeline import PreprocessingStage, ImageInfo
 from UserException import UserException
 
-"""A face, expressed as the (x, y)-coordinates of the two eyes, with the left-most eye in the picture on the first
-row."""
+"""A face expressed as the (x, y)-coordinates of the eyes, with the left-most eye in the picture as the first row."""
 Face = np.ndarray
 """Sorting function for faces to determine which face to select if multiple faces are found."""
 FaceSelectionOverride = Callable[[dlib.full_object_detection], int]
@@ -33,7 +31,7 @@ class FindFacesStage(PreprocessingStage):
 
     error_dir: str
     face_cache: NdarrayCache
-    face_selection_overrides: Dict[str, Callable[[full_object_detection], int]]
+    face_selection_overrides: Dict[str, FaceSelectionOverride]
 
     def __init__(self, cache_dir: str, error_dir: str, face_selection_overrides: Dict[str, FaceSelectionOverride]):
         """
@@ -51,7 +49,7 @@ class FindFacesStage(PreprocessingStage):
         self.face_cache = NdarrayCache(cache_dir, "face", ".cache")
         self.face_selection_overrides = face_selection_overrides
 
-    def preprocess(self, imgs: Images) -> Images:
+    def preprocess(self, imgs: Dict[Path, ImageInfo]) -> Dict[Path, ImageInfo]:
         """
         Finds one face in each image in [imgs], with each face expressed as the positions of the eyes, additionally
         caching the face data in [self.face_cache].
@@ -60,8 +58,8 @@ class FindFacesStage(PreprocessingStage):
         [self.face_selection_overrides]. Additionally, if an exception is thrown, the image is written to
         [self.error_dir] with debugging information.
 
-        :param imgs: the metadata of the images to detect faces in
-        :return: the face found in each image
+        :param imgs: a read-only mapping from original input paths to the preprocessed data obtained thus far
+        :return: a mapping from original input path to the face in the image
         """
 
         global g_face_selection_overrides
@@ -73,18 +71,18 @@ class FindFacesStage(PreprocessingStage):
                                 file=sys.stdout))
 
 
-def find_face(img: Tuple[str, ImageData], face_cache: NdarrayCache, error_dir: str) -> Tuple[str, ImageData]:
+def find_face(img: Tuple[Path, ImageInfo], face_cache: NdarrayCache, error_dir: str) -> Tuple[Path, ImageInfo]:
     """
     Finds the face in [img], expressed as the positions of the eyes, caching the face data in [face_cache].
 
-    Raises a [UserException] if no or multiple faces are found in an image, and [face_selection_overrides] is not
+    Raises a [UserException] if no or multiple faces are found in an image, and [g_face_selection_overrides] is not
     configured for this image. Additionally, if an exception is thrown, the image is written to [error_dir] with
     visualized debugging information.
 
-    :param img: the path to and metadata of the image to find the face in
+    :param img: the original input path and the pre-processing data of the image to find a face in
     :param face_cache: the cache to store the found face in
     :param error_dir: the directory to write debugging information in to assist the user
-    :return: `None`
+    :return: the original input path and the found face
     """
 
     img_path, img_data = img
@@ -97,7 +95,7 @@ def find_face(img: Tuple[str, ImageData], face_cache: NdarrayCache, error_dir: s
     shape_predictor = dlib.shape_predictor(str(Resolver.resource_path("shape_predictor_68_face_landmarks.dat")))
 
     # Find face
-    img = cv2.imread(img_path)
+    img = cv2.imread(str(img_path))
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     faces = dlib.full_object_detections()
@@ -111,7 +109,7 @@ def find_face(img: Tuple[str, ImageData], face_cache: NdarrayCache, error_dir: s
     elif len(faces) == 1:
         face = faces[0]
     else:
-        img_name = os.path.basename(img_path)  # Includes file extension
+        img_name = img_path.name  # Includes file extension
 
         if img_name in g_face_selection_overrides:
             face = sorted(list(faces), key=g_face_selection_overrides[img_name])[0]
@@ -123,8 +121,8 @@ def find_face(img: Tuple[str, ImageData], face_cache: NdarrayCache, error_dir: s
             cv2.imwrite(f"{error_dir}/{img_name}", img)
 
             raise UserException(f"Too many faces: Found {len(faces)} in '{img_path}'. "
-                                f"The image has been stored in '{Path(error_dir).resolve()}' with squares drawn around "
-                                f"all faces that were found. "
+                                f"The image has been stored in '{error_dir}' with squares drawn around all faces that "
+                                f"were found. "
                                 f"You can select which face should be used by adjusting the 'face_selection_override' "
                                 f"option; "
                                 f"see 'config_default.py' for more information.")
