@@ -1,7 +1,7 @@
 import sys
 
-from Pipeline import Pipeline
 from Config import load_config
+from Pipeline import Pipeline
 from UserException import UserException
 from stages.CaptionStage import CaptionStage
 from stages.DemuxStage import DemuxStage
@@ -20,16 +20,16 @@ def main() -> None:
     cfg = load_config()
 
     pipeline = Pipeline()
-    pipeline.register([
-        ReadMetadataStage(),
-        FindFacesStage(cfg["paths"]["cache"], cfg["paths"]["error"], cfg["face_selection_overrides"]),
-        NormalizeStage(cfg["paths"]["cache"]),
-        CaptionStage(cfg["paths"]["cache"], cfg["caption"]["generator"]),  # TODO: Remove this if captions disabled
-        DemuxStage(cfg["paths"]["frames"], cfg["paths"]["output"], cfg["demux"])
-    ])
+    pipeline.register(ReadMetadataStage())
+    pipeline.register(FindFacesStage(cfg["paths"]["cache"], cfg["paths"]["error"], cfg["face_selection_overrides"]))
+    pipeline.register(NormalizeStage(cfg["paths"]["cache"]))
+    if cfg["caption"]["enabled"]:
+        pipeline.register(CaptionStage(cfg["paths"]["cache"], cfg["caption"]["generator"]))
+    if cfg["demux"]["enabled"]:
+        pipeline.register(DemuxStage(cfg["paths"]["output"], cfg["demux"]))
 
     try:
-        pipeline.run(cfg["paths"]["input"])
+        pipeline.run(cfg["paths"]["input"], cfg["paths"]["frames"])
         print("Done!")
     except UserException as exception:
         print("Error: " + exception.args[0], file=sys.stderr)

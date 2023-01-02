@@ -4,18 +4,18 @@ import hashlib
 
 def _tob64(digest: bytes) -> str:
     """
-    Encodes [digest] to a "!@"-base64-string.
+    Encodes [digest] to a "+,"-base64-string.
 
     :param digest: a hash digest
-    :return: [digest] as a "!@"-base64-string
+    :return: [digest] as a "+,"-base64-string
     """
 
-    return base64.b64encode(digest, altchars=b"!@").decode()
+    return base64.b64encode(digest, altchars=b"+,").decode()
 
 
 def hash_file(filename: str) -> str:
     """
-    Calculates the "!@"-base64-encoded SHA3 hash of the contents of [filename].
+    Calculates the "+,"-base64-encoded SHA3 hash of the contents of [filename].
 
     Taken from https://stackoverflow.com/a/44873382.
 
@@ -37,7 +37,7 @@ def hash_file(filename: str) -> str:
 
 def hash_string(string: str) -> str:
     """
-    Calculates the "!@"-base64-encoded SHA3 hash of [string].
+    Calculates the "+,"-base64-encoded SHA3 hash of [string].
 
     :param string: the string to calculate the hash of
     :return: the SHA3 hash of [string]

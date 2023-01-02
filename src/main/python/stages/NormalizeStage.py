@@ -1,5 +1,6 @@
 import math
 import sys
+from typing import Dict
 
 import cv2
 import numpy as np
@@ -26,12 +27,13 @@ class NormalizeStage(ProcessingStage):
 
         self.normalized_cache = ImageCache(cache_dir, "normalized", ".jpg")
 
-    def process(self, imgs: Images) -> ImageCache:
+    def process(self, imgs: Images, input_paths: Dict[str, str]) -> Dict[str, str]:
         """
         Translates, rotates, and resizes each file in [imgs], storing the results in [self.normalized_cache].
 
-        :param imgs: the metadata of the images to normalize
-        :return: [self.normalized_cache]
+        :param imgs: a read-only mapping from input image paths to their pre-processed data
+        :param input_paths: a read-only mapping from input image paths to (partially) processed image paths
+        :return: a mapping from input image paths to processed image paths
         """
 
         img_paths = imgs.keys()
@@ -64,6 +66,7 @@ class NormalizeStage(ProcessingStage):
         min_inner_boundaries = (np.floor(min_inner_boundaries / 2) * 2).astype(int)
 
         # Perform normalization
+        output_paths = {}
         pbar = tqdm(imgs.items(), desc="Normalizing images", file=sys.stdout)
         for img_path, img_data in pbar:
             eyes_string = np.array2string(eyes[img_path])
@@ -75,10 +78,11 @@ class NormalizeStage(ProcessingStage):
 
             # Skip if cached
             if self.normalized_cache.has(img_data["hash"], args_hash):
+                output_paths[img_path] = self.normalized_cache.get_path(img_data["hash"], args_hash)
                 continue
 
             # Read image
-            img = cv2.imread(img_path)
+            img = cv2.imread(input_paths[img_path])
 
             # Resize
             img = cv2.resize(img, scaled_img_dims[img_path])
@@ -104,8 +108,9 @@ class NormalizeStage(ProcessingStage):
 
             # Store normalized image
             self.normalized_cache.cache(img_data["hash"], args_hash, img)
+            output_paths[img_path] = self.normalized_cache.get_path(img_data["hash"], args_hash)
 
-        return self.normalized_cache
+        return output_paths
 
 
 def get_corners(dims: np.ndarray) -> np.ndarray:
