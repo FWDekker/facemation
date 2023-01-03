@@ -158,7 +158,7 @@ class Pipeline:
 
         for idx, img_path in enumerate(natsorted(processed_imgs.keys())):
             frame_path = f"{frames_dir}/{idx}.jpg"
-            os.symlink(os.path.relpath(processed_imgs[img_path]["processed_path"], frames_dir), frame_path)
+            os.link(processed_imgs[img_path]["processed_path"].resolve(), frame_path)
             processed_imgs[img_path]["frame_path"] = frame_path
 
         return processed_imgs
