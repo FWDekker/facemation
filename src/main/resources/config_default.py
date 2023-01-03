@@ -1,6 +1,7 @@
 # This file contains the default configuration. To change the configuration, override settings in the `config.py` file,
 # which must be in the same directory as the Facemation executable.
 config = {
+    # Locations of files.
     "paths": {
         # Directory with the original images to process and turn into a video.
         "input": "input/",

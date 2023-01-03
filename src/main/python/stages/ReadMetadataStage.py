@@ -25,7 +25,7 @@ class ReadMetadataStage(PreprocessingStage):
 
         metadata = {}
 
-        for img_path in tqdm(imgs.keys(), desc="Reading image meta-data", file=sys.stdout):
+        for img_path in tqdm(imgs.keys(), desc="Reading image metadata", file=sys.stdout):
             img_hash = Hasher.hash_file(img_path)
 
             img = Image.open(img_path)

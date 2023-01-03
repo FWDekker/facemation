@@ -137,15 +137,15 @@ class Cache(ABC, Generic[T]):
         pass
 
 
-class ImageCache(Cache[Image]):
+class ImageCache(Cache[Image.Image]):
     """
     Caches images from the Pillow library.
     """
 
-    def _write_data(self, path: Path, data: Image) -> None:
+    def _write_data(self, path: Path, data: Image.Image) -> None:
         data.save(path)
 
-    def _read_data(self, path: Path) -> Image:
+    def _read_data(self, path: Path) -> Image.Image:
         return load_image(path)
 
 

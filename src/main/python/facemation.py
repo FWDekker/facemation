@@ -27,6 +27,7 @@ def main() -> None:
     if cfg["caption"]["enabled"]:
         pipeline.register(CaptionStage(cfg["paths"]["cache"], cfg["caption"]["generator"]))
     if cfg["demux"]["enabled"]:
+        # TODO: Make `output` path relative to executable, not relative to `frame`
         pipeline.register(DemuxStage(cfg["paths"]["output"], cfg["demux"]))
 
     try:
