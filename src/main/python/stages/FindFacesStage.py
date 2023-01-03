@@ -1,5 +1,4 @@
 import functools
-import os
 import sys
 from pathlib import Path
 from typing import Dict, Tuple, Callable
@@ -92,7 +91,7 @@ def find_face(img: Tuple[Path, ImageInfo], face_cache: NdarrayCache, error_dir: 
     # Initialize face recognition
     global g_face_selection_overrides
     detector = dlib.get_frontal_face_detector()
-    shape_predictor = dlib.shape_predictor(str(Resolver.resource_path("shape_predictor_68_face_landmarks.dat")))
+    shape_predictor = dlib.shape_predictor(str(Resolver.resource_path("shape_predictor_5_face_landmarks.dat")))
 
     # Find face
     img = cv2.imread(str(img_path))
@@ -128,8 +127,8 @@ def find_face(img: Tuple[Path, ImageInfo], face_cache: NdarrayCache, error_dir: 
                                 f"see 'config_default.py' for more information.")
 
     # Store results
-    eyes = np.vstack([(np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(36, 42)]), axis=0)),
-                      (np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(42, 48)]), axis=0))])
+    eyes = np.vstack([(np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(2, 4)]), axis=0)),
+                      (np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(0, 2)]), axis=0))])
     face_cache.cache(eyes, img_data["hash"])
 
     return img_path, {"eyes": eyes}

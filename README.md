@@ -5,14 +5,13 @@ This script automatically scales, rotates, crops, and captions all frames so you
 compiles these frames into a timelapse.
 
 ## Requirements
-* [FFmpeg](https://ffmpeg.org/) (e.g. `apt install ffmpeg`)
+* (_Optional_) [FFmpeg](https://ffmpeg.org/) (can be disabled in `config.py`, see below)
 
 ## How to use
 1. Check that you satisfy all the above requirements.
 2. [Download the latest version of Facemation.](https://github.com/FWDekker/facemation/releases/latest)
    Unzip the downloaded archive.
 3. Put your images in the `input/` folder.
-   Currently, only `.jpg`s are supported.
    Files are processed in [natural sort order](https://en.wikipedia.org/wiki/Natural_sort_order).
 4. (_Optional_) Configure Facemation by editing `config.py`.
    Check [`config_default.py`](https://github.com/FWDekker/facemation/blob/master/src/main/resources/config_default.py)
@@ -23,14 +22,16 @@ compiles these frames into a timelapse.
 
 ## Development
 ### Requirements
-* Python 3.9 or newer
-* [`venv`](https://docs.python.org/3/tutorial/venv.html) (e.g. `apt install python3-venv`)
-* [`cmake`](https://cmake.org/) (e.g. `apt install cmake`) (required to install `dlib` dependency)
-* [FFmpeg](https://ffmpeg.org/) (e.g. `apt install ffmpeg`) (to demux frames into a video)
-* [shape_predictor_68_face_landmarks.dat](http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2) (into `src/main/python/resources/`)
+* [Python 3.9](https://www.python.org/)
+* [venv](https://docs.python.org/3/tutorial/venv.html)
+* [CMake](https://cmake.org/) (required to build `dlib`)
+* C++ compiler (required to build `dlib`)
+* [shape_predictor_5_face_landmarks.dat](http://dlib.net/files/shape_predictor_5_face_landmarks.dat.bz2)
+  (store in `src/main/python/resources/`)
 
 ### Setup
 1. Check that you satisfy all the above requirements.
+   Depending on your configuration, you may need to run Python with `python` instead of `python3`.
 2. (_Required once_) Create a [venv](https://docs.python.org/3/tutorial/venv.html):
    ```shell
    python3 -m venv venv/
@@ -63,6 +64,7 @@ python3 -m facemation
    pyinstaller -y --clean -F --add-data="src/main/resources/*:." src/main/python/facemation.py
    cp src/main/resources/config_empty.py dist/config.py
    pip-licenses --with-license-file --no-license-path --output-file=dist/THIRD_PARTY_LICENSES
+   mkdir dist/input/
    python3 -m zipfile -c "facemation-<system>-<version>.zip" dist/*
    # Windows
    # TODO
