@@ -1,16 +1,15 @@
 import copy
-import math
 import sys
 from pathlib import Path
-from typing import Callable, Any, Dict
+from typing import Callable, Dict
 
-import cv2
-import numpy as np
-from PIL import Image
+from PIL import ImageDraw, ImageFont
 from tqdm import tqdm
 
 import Hasher
+import Resolver
 from Cache import ImageCache
+from ImageLoader import load_image
 from Pipeline import ImageInfo, ProcessingStage
 
 
@@ -20,14 +19,14 @@ class CaptionStage(ProcessingStage):
     """
 
     captioned_cache: ImageCache
-    caption_generator: Callable[[str, Any], str]
+    caption_generator: Callable[[str], str]
 
-    def __init__(self, cache_dir: str, caption_generator: Callable[[str, Image], str]):
+    def __init__(self, cache_dir: str, caption_generator: Callable[[str], str]):
         """
         Constructs a new `CaptionStage`.
 
         :param cache_dir: the directory to cache captioned images in
-        :param caption_generator: generates a caption based on the filename and PIL `Image` object
+        :param caption_generator: generates a caption based on the filename
         """
 
         self.captioned_cache = ImageCache(cache_dir, "captioned", ".jpg")
@@ -44,7 +43,7 @@ class CaptionStage(ProcessingStage):
         processed_imgs = copy.deepcopy(imgs)
 
         for img_path, img_data in tqdm(imgs.items(), desc="Adding captions", file=sys.stdout):
-            caption = self.caption_generator(img_path.name, Image.open(img_path))
+            caption = self.caption_generator(img_path.name)
 
             processed_img_hash = Hasher.hash_file(img_data["processed_path"])
             state_hash = Hasher.hash_string(f"{processed_img_hash}-{caption}")
@@ -52,34 +51,16 @@ class CaptionStage(ProcessingStage):
                 processed_imgs[img_path]["processed_path"] = self.captioned_cache.path(img_data["hash"], state_hash)
                 continue
 
-            img = cv2.imread(str(img_data["processed_path"]))
-            img = write_on_image(img, caption, (0.05, 0.95), 0.05)
+            img = load_image(img_data["processed_path"])
+
+            width, height = img.size
+            pos = (0.05 * width, 0.90 * height)
+            font = ImageFont.truetype(str(Resolver.resource_path("Roboto-Regular.ttf")), int(0.05 * height))
+
+            img_draw = ImageDraw.Draw(img)
+            img_draw.text(pos, caption, font=font, stroke_fill=(0, 0, 0), stroke_width=8)
+            img_draw.text(pos, caption, font=font, stroke_fill=(255, 255, 255), stroke_width=1)
 
             processed_imgs[img_path]["processed_path"] = self.captioned_cache.cache(img, img_data["hash"], state_hash)
 
         return processed_imgs
-
-
-def write_on_image(image: np.ndarray, text: str, pos: [float, float], text_height: float) -> np.ndarray:
-    """
-    Writes [text] on [image] at coordinates [pos] with a height of [text_height].
-
-    :param image: the image to write text on; this image is not modified
-    :param text: the text to write onto [image]
-    :param pos: the coordinates to place the text at, as a ratio of the size of [image]
-    :param text_height: the height of the text, as a ratio of the height of [image]
-    :return: a copy of [image] with text written on it
-    """
-
-    height, width = image.shape[:2]
-    text_scale = cv2.getTextSize(text, fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=1, thickness=32)
-    text_scale = text_height / (text_scale[0][1] / height)
-    text_pos = math.floor(pos[0] * width), math.floor(pos[1] * height)
-
-    image = cv2.putText(image, text, text_pos,
-                        fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=text_scale,
-                        color=(0, 0, 0), thickness=32, lineType=cv2.LINE_AA)
-    image = cv2.putText(image, text, text_pos,
-                        fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=text_scale,
-                        color=(255, 255, 255), thickness=16, lineType=cv2.LINE_AA)
-    return image

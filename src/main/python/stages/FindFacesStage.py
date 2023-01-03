@@ -3,14 +3,15 @@ import sys
 from pathlib import Path
 from typing import Dict, Tuple, Callable
 
-import cv2
 import dlib
 import numpy as np
+from PIL import ImageDraw
 from tqdm.contrib.concurrent import process_map
 
 import Files
 import Resolver
 from Cache import NdarrayCache
+from ImageLoader import load_image
 from Pipeline import PreprocessingStage, ImageInfo
 from UserException import UserException
 
@@ -70,21 +71,21 @@ class FindFacesStage(PreprocessingStage):
                                 file=sys.stdout))
 
 
-def find_face(img: Tuple[Path, ImageInfo], face_cache: NdarrayCache, error_dir: str) -> Tuple[Path, ImageInfo]:
+def find_face(img_tuple: Tuple[Path, ImageInfo], face_cache: NdarrayCache, error_dir: str) -> Tuple[Path, ImageInfo]:
     """
-    Finds the face in [img], expressed as the positions of the eyes, caching the face data in [face_cache].
+    Finds the face in [img_tuple], expressed as the positions of the eyes, caching the face data in [face_cache].
 
     Raises a [UserException] if no or multiple faces are found in an image, and [g_face_selection_overrides] is not
     configured for this image. Additionally, if an exception is thrown, the image is written to [error_dir] with
     visualized debugging information.
 
-    :param img: the original input path and the pre-processing data of the image to find a face in
+    :param img_tuple: the original input path and the pre-processing data of the image to find a face in
     :param face_cache: the cache to store the found face in
     :param error_dir: the directory to write debugging information in to assist the user
     :return: the original input path and the found face
     """
 
-    img_path, img_data = img
+    img_path, img_data = img_tuple
     if face_cache.has(img_data["hash"]):
         return img_path, {"eyes": face_cache.load(img_data["hash"])}
 
@@ -94,13 +95,13 @@ def find_face(img: Tuple[Path, ImageInfo], face_cache: NdarrayCache, error_dir: 
     shape_predictor = dlib.shape_predictor(str(Resolver.resource_path("shape_predictor_5_face_landmarks.dat")))
 
     # Find face
-    img = cv2.imread(str(img_path))
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
+    img = load_image(img_path)
+    # noinspection PyTypeChecker
+    img_np = np.array(img)
     faces = dlib.full_object_detections()
-    detections = detector(img_rgb, 1)
+    detections = detector(img_np, 1)
     for detection in detections:
-        faces.append(shape_predictor(img_rgb, detection))
+        faces.append(shape_predictor(img_np, detection))
 
     # Determine what to do if there are multiple faces
     if len(faces) == 0:
@@ -113,11 +114,14 @@ def find_face(img: Tuple[Path, ImageInfo], face_cache: NdarrayCache, error_dir: 
         if img_name in g_face_selection_overrides:
             face = sorted(list(faces), key=g_face_selection_overrides[img_name])[0]
         else:
+            img_draw = ImageDraw.Draw(img)
+
             bb = [it.rect for it in faces]
             bb = [((it.left(), it.top()), (it.right(), it.bottom())) for it in bb]
             for it in bb:
-                img = cv2.rectangle(img, it[0], it[1], (255, 0, 0), 5)
-            cv2.imwrite(f"{error_dir}/{img_name}", img)
+                img_draw.rectangle(it[0], it[1], (255, 0, 0), 5)
+
+            img.save(f"{error_dir}/{img_name}")
 
             raise UserException(f"Too many faces: Found {len(faces)} in '{img_path}'. "
                                 f"The image has been stored in '{error_dir}' with squares drawn around all faces that "

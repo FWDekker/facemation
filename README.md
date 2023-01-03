@@ -6,17 +6,14 @@ compiles these frames into a timelapse.
 
 ## Installation
 ### Windows
-1. [Install  Visual C++ Redistributable for Visual Studio 2015 .](https://www.microsoft.com/en-us/download/details.aspx?id=48145)
-2. [Install the Media Feature Pack.](https://support.microsoft.com/en-us/topic/media-feature-pack-list-for-windows-n-editions-c1c6fffa-d052-8338-7a79-a4bb980a700a)
-3. Restart your computer.
-4. [Download FFmpeg.](https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip)
+1. [Download FFmpeg.](https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip)
    (If you have [7-Zip](https://www.7-zip.org/) installed,
    [download the `.7z` archive instead](https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-essentials.7z).)
-5. Unzip the downloaded archive into a new directory.
-6. [Download the latest version of Facemation for Windows.](https://github.com/FWDekker/facemation/releases/latest)
-7. Unzip the downloaded archive into a new directory.
-8. Enter the directory where you unzipped FFmpeg, enter the `bin` directory, and copy the file `ffmpeg.exe` to the
-   directory where you unzipped Facemation.
+2. Unzip the downloaded archive into a new directory.
+3. [Download the latest version of Facemation for Windows.](https://github.com/FWDekker/facemation/releases/latest)
+4. Unzip the downloaded archive into another new directory.
+5. Enter the directory where you unzipped FFmpeg, enter the `bin` directory, and copy the file `ffmpeg.exe` to the
+   directory where you unzipped Facemation.  
    You should now have `facemation.exe` and `ffmpeg.exe` in the same directory.
 
 ### Linux

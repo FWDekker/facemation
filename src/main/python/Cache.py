@@ -4,16 +4,18 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TypeVar, Generic, List
 
-import cv2
 import numpy as np
+from PIL import Image
 
 import Files
+from ImageLoader import load_image
 
 """The type of data stored in a cache."""
 T = TypeVar("T")
 
 
 # TODO: Keep track of `state`s in an index file, to prevent overly long filenames
+# TODO: Add some kind of versioning, in case code makes a breaking change w.r.t. users' existing caches
 class Cache(ABC, Generic[T]):
     """
     Stores data identified by a key, associated with a state that identifies the contents of the datum.
@@ -135,16 +137,16 @@ class Cache(ABC, Generic[T]):
         pass
 
 
-class ImageCache(Cache[np.ndarray]):
+class ImageCache(Cache[Image]):
     """
-    Caches images from the CV2 library.
+    Caches images from the Pillow library.
     """
 
-    def _write_data(self, path: Path, data: np.ndarray) -> None:
-        cv2.imwrite(str(path), data)
+    def _write_data(self, path: Path, data: Image) -> None:
+        data.save(path)
 
-    def _read_data(self, path: Path) -> np.ndarray:
-        return cv2.imread(str(path))
+    def _read_data(self, path: Path) -> Image:
+        return load_image(path)
 
 
 class NdarrayCache(Cache[np.ndarray]):

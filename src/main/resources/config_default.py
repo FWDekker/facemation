@@ -44,10 +44,8 @@ config = {
     "caption": {
         # Set to `True` to add a caption to each frame.
         "enabled": False,
-        # Given the image's filename and the `Image` object from the PIL library, generates the string caption to add to
-        # the image. See https://pillow.readthedocs.io/en/stable/reference/Image.html for more information on the
-        # `Image` object.
-        "generator": (lambda filename, image: f"{filename}: {image.size}"),
+        # Generates the caption for the image using the image's filename (including extension).
+        "generator": (lambda filename: filename),
     },
 
     # Combine the processed images into a video.

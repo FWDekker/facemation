@@ -4,12 +4,13 @@ import sys
 from pathlib import Path
 from typing import Dict
 
-import cv2
 import numpy as np
+from PIL import Image
 from tqdm import tqdm
 
 import Hasher
 from Cache import ImageCache
+from ImageLoader import load_image
 from Pipeline import ProcessingStage, ImageInfo
 from UserException import UserException
 
@@ -83,30 +84,23 @@ class NormalizeStage(ProcessingStage):
                 processed_imgs[img_path]["processed_path"] = self.normalized_cache.path(img_data["hash"], state_hash)
                 continue
 
-            # Read image
-            img = cv2.imread(str(img_data["processed_path"]))
-
-            # Resize
-            img = cv2.resize(img, scaled_img_dims[img_path])
-
-            # Translate
-            translation = np.float32([[1, 0, translations[img_path][0]], [0, 1, translations[img_path][1]]])
-            img = cv2.warpAffine(img, translation, scaled_img_dims[img_path] + translations[img_path])
-
-            # Rotate
+            # Validate normalization parameters
             if math.fabs(math.degrees(angles[img_path])) >= 45.0:
                 raise UserException(f"Image '{img_path}' is rotated by {math.degrees(angles[img_path])}, but "
                                     f"Facemation only supports angles up to 45 degrees (but preferably much lower). "
                                     f"You should manually rotate the image and crop out the relevant parts, or remove "
                                     f"the image from the inputs altogether.")
 
-            rotation = cv2.getRotationMatrix2D(max_scaled_eye_center.astype(float),
-                                               -math.degrees(angles[img_path]),
-                                               1.0)
-            img = cv2.warpAffine(img, rotation, img.shape[1::-1], flags=cv2.INTER_LINEAR)
+            # Normalize image
+            translated_dims = tuple(scaled_img_dims[img_path] + translations[img_path])
+            translation_matrix = (1, 0, -translations[img_path][0], 0, 1, -translations[img_path][1])
 
-            # Crop
-            img = img[min_inner_boundaries[1]:min_inner_boundaries[3], min_inner_boundaries[0]:min_inner_boundaries[2]]
+            img = load_image(img_data["processed_path"])
+            img = img.resize(scaled_img_dims[img_path])
+            img = img.transform(translated_dims, Image.AFFINE, translation_matrix)
+            img = img.rotate(-math.degrees(angles[img_path]), center=tuple(max_scaled_eye_center))
+            img = img.crop((min_inner_boundaries[0], min_inner_boundaries[1],
+                            min_inner_boundaries[2], min_inner_boundaries[3]))
 
             # Store normalized image
             processed_imgs[img_path]["processed_path"] = self.normalized_cache.cache(img, img_data["hash"], state_hash)
