@@ -31,52 +31,76 @@ compiles these frames into a timelapse.
 * [shape_predictor_5_face_landmarks.dat](http://dlib.net/files/shape_predictor_5_face_landmarks.dat.bz2)
   (store in `src/main/python/resources/`)
 
-### Setup
+### Initial setup
 1. Check that you satisfy all the above requirements.
-2. (_Required once_) Create a [venv](https://docs.python.org/3/tutorial/venv.html):
+   On Windows, always use PowerShell.
+2. Create a [venv](https://docs.python.org/3/tutorial/venv.html):
    ```shell
    python -m venv venv/
    ```
 3. Activate the venv:
-   ```shell
-   # Linux
-   source venv/bin/activate
-   # Windows PowerShell
-   ./venv/Scripts/activate
-   ```
-4. (_Required once_) Install dependencies:
+   * Linux
+     ```shell
+     source venv/bin/activate
+     ```
+   * Windows PowerShell
+     ```shell
+     ./venv/Scripts/activate
+     ```
+4. Install dependencies:
    ```shell
    python -m pip install -r requirements.txt
    ```
-5. (_Optional_) Copy `src/main/python/config_empty.py` to `config_dev.py` in your working directory.
-   `config_dev.py` overrides both `config_default.py` and `config.py`.
+5. (_Optional_) Use `config_dev.py` to override both `config_default.py` and `config.py`.
+   ```shell
+   cp src/main/python/config_empty.py config_dev.py
+   ```
 
 ### Execute
-Run the script:
-```shell
-python src/main/python/facemation.py
-```
+1. Activate the venv:
+   * Linux
+     ```shell
+     source venv/bin/activate
+     ```
+   * Windows PowerShell
+     ```shell
+     ./venv/Scripts/activate
+     ```
+2. Run script:
+   ```shell
+   python src/main/python/facemation.py
+   ```
 
 ### Build
-1. Build executable into `dist/`:
+1. Activate the venv:
+   * Linux
+     ```shell
+     source venv/bin/activate
+     ```
+   * Windows PowerShell
+     ```shell
+     ./venv/Scripts/activate
+     ```
+2. Build executable into `dist/` and create `.zip` distribution:
+   * Linux
+     ```shell
+     pyinstaller -y --clean -F --add-data="src/main/resources/*:." src/main/python/facemation.py
+     mkdir dist/input/
+     cp README.md dist/README.md
+     cp src/main/resources/config_empty.py dist/config.py
+     pip-licenses --with-license-file --no-license-path --output-file=dist/THIRD_PARTY_LICENSES
+     python -m zipfile -c "facemation-[system]-[version].zip" dist/*
+     ```
+   * Windows PowerShell
+     ```shell
+     pyinstaller -y --clean -F --add-data="src/main/resources/*;." src/main/python/facemation.py
+     mkdir dist/input/
+     cp README.md dist/README.md
+     cp src/main/resources/config_empty.py dist/config.py
+     pip-licenses --with-license-file --no-license-path --output-file=dist/THIRD_PARTY_LICENSES
+     python -m zipfile -c "facemation-[system]-[version].zip" $(Resolve-Path -Relative "dist/*")
+     ```
+3. Run executable:
    ```shell
-   # Linux
-   pyinstaller -y --clean -F --add-data="src/main/resources/*:." src/main/python/facemation.py
-   cp src/main/resources/config_empty.py dist/config.py
-   pip-licenses --with-license-file --no-license-path --output-file=dist/THIRD_PARTY_LICENSES
-   mkdir dist/input/
-   python -m zipfile -c "facemation-[system]-[version].zip" dist/*
-   # Windows PowerShell
-   pyinstaller -y --clean -F --add-data="src/main/resources/*;." src/main/python/facemation.py
-   cp src/main/resources/config_empty.py dist/config.py
-   pip-licenses --with-license-file --no-license-path --output-file=dist/THIRD_PARTY_LICENSES
-   mkdir dist/input/
-   python -m zipfile -c "facemation-[system]-[version].zip" $(Resolve-Path -Relative "dist/*")
-   ```
-2. Run executable:
-   ```shell
-   # Linux
    dist/facemation
-   # Windows
-   dist/facemation.exe
    ```

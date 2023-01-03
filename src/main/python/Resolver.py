@@ -33,8 +33,8 @@ def resource_path(path: str) -> Path:
     """
     Returns the path to the resource at [relative_path].
 
-    A resource is a file bundled into the executable file by PyInstaller. If this function is not invoked from the
-    executable, the returned path is relative to the current working directory.
+    A resource is a file bundled into the frozen executable. If this function is not invoked from the executable, the
+    returned path is relative to the current working directory.
 
     :param path: the path to the resource
     :return: the path to the resource at [relative_path]

@@ -1,4 +1,5 @@
 import sys
+from multiprocessing import freeze_support
 
 from ConfigLoader import load_config
 from Pipeline import Pipeline
@@ -36,4 +37,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    freeze_support()
     main()
