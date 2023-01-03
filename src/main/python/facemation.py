@@ -1,6 +1,6 @@
 import sys
 
-from Config import load_config
+from ConfigLoader import load_config
 from Pipeline import Pipeline
 from UserException import UserException
 from stages.CaptionStage import CaptionStage

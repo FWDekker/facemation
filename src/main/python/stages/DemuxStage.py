@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Dict
 
 import Files
-from Config import FacemationConfig
+from ConfigLoader import FacemationConfig
 from Pipeline import PostprocessingStage, ImageInfo
 from UserException import UserException
 
