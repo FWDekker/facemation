@@ -154,9 +154,12 @@ cython_debug/
 
 
 ## Custom
+venv_build/
 input/
 output/
-*.dat
-*.xml
+
 config_dev.py
+ffmpeg.exe
+shape_predictor_5_face_landmarks.dat
+
 facemation*.zip
