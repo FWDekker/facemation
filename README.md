@@ -22,7 +22,7 @@ compiles these frames into a timelapse.
 
 ## Development
 ### Requirements
-* [Python 3.9](https://www.python.org/)
+* [Python 3.10](https://www.python.org/)
 * [venv](https://docs.python.org/3/tutorial/venv.html)
 * [CMake](https://cmake.org/) (required to build `dlib`)
 * C++ compiler (required to build `dlib`)
@@ -31,21 +31,20 @@ compiles these frames into a timelapse.
 
 ### Setup
 1. Check that you satisfy all the above requirements.
-   Depending on your configuration, you may need to run Python with `python` instead of `python3`.
 2. (_Required once_) Create a [venv](https://docs.python.org/3/tutorial/venv.html):
    ```shell
-   python3 -m venv venv/
+   python -m venv venv/
    ```
 3. Activate the venv:
    ```shell
    # Linux
    source venv/bin/activate
-   # Windows
-   .\venv\Scripts\activate
+   # Windows PowerShell
+   ./venv/Scripts/activate
    ```
 4. (_Required once_) Install dependencies:
    ```shell
-   python3 -m pip install -r requirements.txt
+   python -m pip install -r requirements.txt
    ```
 5. (_Optional_) Copy `src/main/python/config_empty.py` to `config_dev.py` in your working directory.
    `config_dev.py` overrides both `config_default.py` and `config.py`.
@@ -54,7 +53,7 @@ compiles these frames into a timelapse.
 Run the script:
 ```shell
 cd src/main/python/
-python3 -m facemation
+python -m facemation
 ```
 
 ### Build
@@ -65,9 +64,13 @@ python3 -m facemation
    cp src/main/resources/config_empty.py dist/config.py
    pip-licenses --with-license-file --no-license-path --output-file=dist/THIRD_PARTY_LICENSES
    mkdir dist/input/
-   python3 -m zipfile -c "facemation-<system>-<version>.zip" dist/*
-   # Windows
-   # TODO
+   python -m zipfile -c "facemation-[system]-[version].zip" dist/*
+   # Windows PowerShell
+   pyinstaller -y --clean -F --add-data="src/main/resources/*;." src/main/python/facemation.py
+   cp src/main/resources/config_empty.py dist/config.py
+   pip-licenses --with-license-file --no-license-path --output-file=dist/THIRD_PARTY_LICENSES
+   mkdir dist/input/
+   python -m zipfile -c "facemation-[system]-[version].zip" $(Resolve-Path -Relative "dist/*")
    ```
 2. Run executable:
    ```shell
