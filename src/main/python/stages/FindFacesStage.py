@@ -1,7 +1,7 @@
 import functools
 import sys
 from pathlib import Path
-from typing import Dict, Tuple, Callable
+from typing import Dict, Tuple, Callable, TypedDict
 
 import dlib
 import numpy as np
@@ -17,7 +17,7 @@ from UserException import UserException
 
 Face = np.ndarray  # (x, y)-coordinates of the eyes, with the left-most eye in the picture as the first row
 FaceSelectionOverride = Callable[[dlib.full_object_detection], int]
-FindFacesConfig = Dict[str, FaceSelectionOverride]
+FindFacesConfig = TypedDict("FindFacesConfig", {"face_selection_overrides": Dict[str, FaceSelectionOverride]})
 
 # Global field because this cannot be pickled between parallel processes
 g_face_selection_overrides: Dict[str, FaceSelectionOverride]

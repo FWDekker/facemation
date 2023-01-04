@@ -12,6 +12,7 @@ mkdir dist/
 mkdir dist/input/
 cp README.md dist/README.txt
 cp src/main/resources/config_empty.py dist/config.py
+# TODO: Add licenses for Python and Roboto font
 pip-licenses --with-license-file --no-license-path --output-file=dist/THIRD_PARTY_LICENSES.txt
 pyinstaller -y -F \
   --noupx \

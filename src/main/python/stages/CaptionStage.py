@@ -47,7 +47,7 @@ class CaptionStage(ProcessingStage):
         processed_imgs = copy.deepcopy(imgs)
 
         for img_path, img_data in tqdm(imgs.items(), desc="Adding captions", file=sys.stdout):
-            caption = self.caption_generator(img_path.name)
+            caption = str(self.caption_generator(img_path.name))
 
             processed_img_hash = Hasher.hash_file(img_data["processed_path"])
             state_hash = Hasher.hash_string(f"{processed_img_hash}-{caption}")

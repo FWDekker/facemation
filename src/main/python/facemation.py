@@ -5,7 +5,7 @@ from ConfigLoader import load_config
 from Pipeline import Pipeline
 from UserException import UserException
 from stages.CaptionStage import CaptionStage
-from stages.DemuxStage import DemuxStage
+from stages.FfmpegStage import FfmpegStage
 from stages.FindFacesStage import FindFacesStage
 from stages.NormalizeStage import NormalizeStage
 from stages.ReadMetadataStage import ReadMetadataStage
@@ -22,16 +22,16 @@ def main() -> None:
 
     pipeline = Pipeline()
     pipeline.register(ReadMetadataStage())
-    pipeline.register(FindFacesStage(cfg["paths"]["cache"], cfg["paths"]["error"], cfg["face_selection_overrides"]))
+    pipeline.register(FindFacesStage(cfg["paths"]["cache"], cfg["paths"]["error"],
+                                     cfg["find_faces"]["face_selection_overrides"]))
     pipeline.register(NormalizeStage(cfg["paths"]["cache"]))
     if cfg["caption"]["enabled"]:
         pipeline.register(CaptionStage(cfg["paths"]["cache"], cfg["caption"]["generator"]))
-    if cfg["demux"]["enabled"]:
-        pipeline.register(DemuxStage(cfg["paths"]["output"], cfg["demux"]))
+    if cfg["ffmpeg"]["enabled"]:
+        pipeline.register(FfmpegStage(cfg["paths"]["output"], cfg["ffmpeg"]))
 
     try:
         pipeline.run(cfg["paths"]["input"], cfg["paths"]["frames"])
-        print("Done!")
     except UserException as exception:
         print("Error: " + exception.args[0], file=sys.stderr)
 

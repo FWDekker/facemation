@@ -9,24 +9,24 @@ import Files
 from Pipeline import PostprocessingStage, ImageInfo
 from UserException import UserException
 
-DemuxConfig = TypedDict("DemuxConfig", {"enabled": bool,
-                                        "fps": Union[str, int],
-                                        "codec": str,
-                                        "crf": Union[str, int],
-                                        "video_filters": List[str]})
+FfmpegConfig = TypedDict("FfmpegConfig", {"enabled": bool,
+                                          "fps": Union[str, int],
+                                          "codec": str,
+                                          "crf": Union[str, int],
+                                          "video_filters": List[str]})
 
 
-class DemuxStage(PostprocessingStage):
+class FfmpegStage(PostprocessingStage):
     """
     Demuxes the processed frames into a video.
     """
 
     output_path: str
-    cfg: DemuxConfig
+    cfg: FfmpegConfig
 
-    def __init__(self, output_path: str, cfg: DemuxConfig):
+    def __init__(self, output_path: str, cfg: FfmpegConfig):
         """
-        Constructs a new `DemuxStage`.
+        Constructs a new `FfmpegStage`.
 
         Raises a [UserException] if this stage is enabled but FFmpeg is not installed.
 
@@ -41,7 +41,6 @@ class DemuxStage(PostprocessingStage):
 
         if shutil.which("ffmpeg") is None:
             raise UserException(f"FFmpeg is enabled in your configuration but is not installed. "
-                                f"Without FFmpeg, Facemation can create frames, but cannot produce a video. "
                                 f"Install FFmpeg or disable FFmpeg in your configuration. "
                                 f"Check the README for more information.")
 
@@ -55,6 +54,8 @@ class DemuxStage(PostprocessingStage):
         :return: `None`
         """
 
+        # TODO: Support adding custom FFmpeg path
+        # TODO: Support custom options and filters
         args = ["ffmpeg"]
         args += ["-hide_banner"]
         args += ["-loglevel", "error"]
@@ -69,9 +70,11 @@ class DemuxStage(PostprocessingStage):
             args += ["-vf", ",".join(self.cfg["video_filters"])]
         args += [os.path.relpath(self.output_path, frames_dir)]
 
-        print("Demuxing into video:")
+        print("Combining frames into a video:")
         try:
             subprocess.run(args, cwd=frames_dir, stderr=sys.stdout, check=True)
+
+            print(f"Your video has been saved in {Path(self.output_path).resolve()}.")
         except Exception as exception:
             raise UserException("FFmpeg failed to create a video. "
                                 "Read the messages above for more information.", exception) from None

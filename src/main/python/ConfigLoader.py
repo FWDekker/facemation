@@ -6,7 +6,7 @@ from typeguard import check_return_type
 
 import Resolver
 from stages.CaptionStage import CaptionConfig
-from stages.DemuxStage import DemuxConfig
+from stages.FfmpegStage import FfmpegConfig
 from stages.FindFacesStage import FindFacesConfig
 
 PathsConfig = TypedDict("PathsConfig",
@@ -16,9 +16,9 @@ PathsConfig = TypedDict("PathsConfig",
                          "frames": str,
                          "output": str})
 FacemationConfig = TypedDict("FacemationConfig", {"paths": PathsConfig,
-                                                  "face_selection_overrides": FindFacesConfig,
+                                                  "find_faces": FindFacesConfig,
                                                   "caption": CaptionConfig,
-                                                  "demux": DemuxConfig})
+                                                  "ffmpeg": FfmpegConfig})
 
 
 def load_config() -> FacemationConfig:

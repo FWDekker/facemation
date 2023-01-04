@@ -85,6 +85,7 @@ class NormalizeStage(ProcessingStage):
                 continue
 
             # Validate normalization parameters
+            # TODO: Add a warning at, say, 30 degrees?
             if math.fabs(math.degrees(angles[img_path])) >= 45.0:
                 raise UserException(f"Image '{img_path}' is rotated by {math.degrees(angles[img_path])}, but "
                                     f"Facemation only supports angles up to 45 degrees (but preferably much lower). "

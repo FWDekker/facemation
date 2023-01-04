@@ -4,8 +4,13 @@ Turn your daily selfies into a good-looking timelapse.
 This script automatically scales, rotates, crops, and captions all frames so your eyes are aligned in each photo, and
 compiles these frames into a timelapse.
 
-## Installation
-### Windows 10 / Windows 11
+## Usage instructions
+If you need help with installing or using Facemation, please feel free to
+[start a discussion](https://github.com/FWDekker/facemation/discussions) or
+[contact me directly](https://fwdekker.com/about/).
+
+### How to install
+#### Windows 10 / Windows 11
 1. [Download FFmpeg.](https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip)
    (If you have [7-Zip](https://www.7-zip.org/) installed,
    [download the `.7z` archive instead](https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-essentials.7z).)
@@ -16,25 +21,98 @@ compiles these frames into a timelapse.
    directory where you unzipped Facemation.  
    You should now have `facemation.exe` and `ffmpeg.exe` in the same directory.
 
-### Linux
+#### Linux
 1. Install [FFmpeg](https://ffmpeg.org/).
    On Ubuntu/Debian, you can simply do `apt install ffmpeg`.
 2. [Download the latest version of Facemation for Linux.](https://github.com/FWDekker/facemation/releases/latest)
 3. Unzip the downloaded archive into a new directory.
 
-## How to use
+#### macOS
+Unfortunately, I don't have macOS, which means that I cannot create an executable for macOS systems.
+Your best bet is probably to run the Python scripts directly by following the development instructions below, but even
+then I cannot guarantee it will work.
+If you have suggestions for how I can solve this, please let me know by
+[opening an issue](https://github.com/FWDekker/facemation/issues),
+[starting a discussion](https://github.com/FWDekker/facemation/discussions), or
+[contacting me directly](https://fwdekker.com/about/).
+
+### How to use
 1. Enter the directory where you installed Facemation.
 2. Put the images you want Facemation to process in the `input` directory.
 3. Rename files if necessary so that they are in the right order.
    Images are processed in [natural sort order](https://en.wikipedia.org/wiki/Natural_sort_order).
 4. Execute `facemation` by double-clicking it.
-5. Check the newly created `output` directory and adjust `config.py` as desired.
-   Check [`config_default.py`](https://github.com/FWDekker/facemation/blob/master/src/main/resources/config_default.py)
-   for a list of all options.
+5. Check the created video in `output/facemation.mp4`.
 
 All intermediate results are heavily cached, so subsequent runs are much faster.
 
-## Development
+### How to configure
+You can change how Facemation behaves by editing the `config.py` file.
+Below are some examples of how you can configure Facemation.
+Check [`config_default.py`](https://github.com/FWDekker/facemation/blob/master/src/main/resources/config_default.py) for
+a list of all options.
+
+#### Disable FFmpeg
+If you do not have FFmpeg, you can disable it.
+Facemation will still work, but will skip the final step of creating a video.
+
+```python
+config = {
+    "ffmpeg": {
+        "enabled": False,
+    }
+}
+```
+
+#### Show the date in each frame
+This code assumes that each filename is something like `IMG_20230104_174807.jpg`.
+
+```python
+from datetime import datetime
+
+config = {
+    "caption": {
+        "enabled": True,
+        "generator": (lambda filename: str(datetime.strptime(filename, "IMG_%Y%m%d_%H%M%S.jpg").date())),
+    },
+}
+```
+
+#### Show the number of days since an important event in each frame
+This code assumes that each filename is something like `IMG_20230104_174807.jpg`.
+
+```python
+from datetime import datetime
+
+important_date = datetime(year=2023, month=1, day=1).date()
+
+config = {
+    "caption": {
+        "enabled": True,
+        "generator":
+            (lambda filename: str((datetime.strptime(filename, "IMG_%Y%m%d_%H%M%S.jpg").date() - important_date).days)),
+    },
+}
+```
+
+#### Adding music
+Using FFmpeg, you can add music to the video after Facemation is done.
+1. Put your music file in the directory that contains `config.py`.
+2. Open a command prompt in the directory where you have `config.py` and run the following command.
+   Replace `audio.mp3` with the actual name of your music file.
+   ```shell
+   ffmpeg -i output/facemation.mp4 -i audio.mp3 -c:v copy -shortest output/facemation-audio.mp4
+   ```
+   Alternatively, if you want the audio to fade out at the end, run
+   ```shell
+   ffmpeg -i output/facemation.mp4 -i audio.mp3 -af "afade=t=out:st=50:d=3" -c:v copy -shortest output/facemation-audio.mp4
+   ```
+   The audio will fade out after 50 seconds, and the fading out will take 3 seconds.
+3. You should now have a file `facemation-audio.mp4` in the `output` directory.
+
+## Development instructions
+If you are a developer and want to help with or change Facemation, these instructions are for you.
+
 ### Requirements
 #### All systems
 * [`shape_predictor_5_face_landmarks.dat`](http://dlib.net/files/shape_predictor_5_face_landmarks.dat.bz2)
@@ -107,9 +185,9 @@ All intermediate results are heavily cached, so subsequent runs are much faster.
 
 ### Build executable for distribution
 #### Requirements
-* All development requirements listed above.
+* All development requirements listed above
 * (_Linux only_) [Requirements for `staticx`](https://staticx.readthedocs.io/en/latest/installation.html)
-* (_Windows only_) Always use PowerShell.
+* (_Windows only_) Always use PowerShell
 * (_Windows only_) [Windows SDK](https://developer.microsoft.com/en-us/windows/downloads/windows-sdk/)  
   Copy all DLLs in `C:/Program Files (x86)/Windows Kits/10/Redist/[version]/ucrt/x64` to `src/python/resources/`.
   Note that the `[version]` in the path differs per system.
@@ -120,14 +198,14 @@ All intermediate results are heavily cached, so subsequent runs are much faster.
 2. Check the version number in the `version` file.
 3. Check that `config_empty.py` is up-to-date with `config_default.py`.
 4. Build executable into `dist/` and create `.zip` distribution:
-   * Linux
-     ```shell
-     ./build_linux.sh
-     ```
-   * Windows PowerShell
-     ```shell
-     ./build_windows.ps1
-     ```
+    * Linux
+      ```shell
+      ./build_linux.sh
+      ```
+    * Windows PowerShell
+      ```shell
+      ./build_windows.ps1
+      ```
 5. Run executable:
    ```shell
    dist/facemation

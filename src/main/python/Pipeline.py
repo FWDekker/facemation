@@ -128,6 +128,7 @@ class Pipeline:
 
         Files.mkdir(input_dir)
 
+        # TODO: Check how many non-matching files there are; warn if files are skipped
         img_paths = Files.glob_extensions(input_dir, "bmp,dib,jpeg,jpg,jpe,jp2,png,pbm,pgm,ppm,sr,ras,tiff,tif")
         if len(img_paths) == 0:
             raise UserException(f"No images detected in '{Path(input_dir).resolve()}'. "
