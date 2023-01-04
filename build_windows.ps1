@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-if (Test-Path venv_build/) {rm -r -force venv_build/}
+if (Test-Path venv_build/) {Remove-Item -Recurse -Force venv_build/}
 python -m venv venv_build/
 if (-not $?) {throw "Failed to create venv."}
 ./venv_build/Scripts/activate
@@ -10,16 +10,16 @@ if (-not $?) {throw "Failed to install requirements."}
 python -m pip install -r requirements/build_windows.txt
 if (-not $?) {throw "Failed to install requirements."}
 
-if (Test-Path build/) {rm -r -force build/}
-if (Test-Path dist/) {rm -r -force dist/}
-if (Test-Path facemation.spec) {rm facemation.spec}
-mkdir dist/
-mkdir dist/input/
-cp README.md dist/README.txt
-cp src/main/resources/config_empty.py dist/config.py
+if (Test-Path build/) {Remove-Item -Recurse -Force build/}
+if (Test-Path dist/) {Remove-Item -Recurse -Force dist/}
+if (Test-Path facemation.spec) {Remove-Item facemation.spec}
+New-Item -Name "dist/" -ItemType "directory"
+New-Item -Name "dist/input/" -ItemType "directory"
+Copy-Item README.md -Destination dist/README.txt
+Copy-Item src/main/resources/config_empty.py -Destination dist/config.py
 pip-licenses --with-license-file --no-license-path --format=plain-vertical --output-file=dist/THIRD_PARTY_LICENSES.txt
-cat src/main/resources/licenses_extra.txt >> dist/THIRD_PARTY_LICENSES.txt
 if (-not $?) {throw "Failed to extract licenses from dependencies."}
+Add-Content -Path dist/THIRD_PARTY_LICENSES.txt -Value $(Get-Content -Path src/main/resources/licenses_extra.txt)
 pyinstaller -y -F `
     --noupx `
     --add-binary="src/main/resources/*.dll;." `
