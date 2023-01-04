@@ -1,4 +1,3 @@
-import os
 import shutil
 import subprocess
 import sys
@@ -10,10 +9,15 @@ from Pipeline import PostprocessingStage, ImageInfo
 from UserException import UserException
 
 FfmpegConfig = TypedDict("FfmpegConfig", {"enabled": bool,
+                                          "exe_path": str,
+                                          "output_path": str,
                                           "fps": Union[str, int],
                                           "codec": str,
                                           "crf": Union[str, int],
-                                          "video_filters": List[str]})
+                                          "video_filters": List[str],
+                                          "custom_global_options": List[str],
+                                          "custom_inputs": List[str],
+                                          "custom_output_options": List[str]})
 
 
 class FfmpegStage(PostprocessingStage):
@@ -21,25 +25,22 @@ class FfmpegStage(PostprocessingStage):
     Demuxes the processed frames into a video.
     """
 
-    output_path: str
     cfg: FfmpegConfig
 
-    def __init__(self, output_path: str, cfg: FfmpegConfig):
+    def __init__(self, cfg: FfmpegConfig):
         """
         Constructs a new `FfmpegStage`.
 
-        Raises a [UserException] if this stage is enabled but FFmpeg is not installed.
+        Raises a [UserException] if this stage is enabled but the FFmpeg executable cannot be found.
 
-        :param output_path: the directory to store the video in
         :param cfg: the configuration for the demuxer
         """
 
-        Files.rm(output_path)
+        Files.rm(cfg["output_path"])
 
-        self.output_path = output_path
         self.cfg = cfg
 
-        if shutil.which("ffmpeg") is None:
+        if (not Path(cfg["exe_path"]).exists()) and (shutil.which("ffmpeg") is None):
             raise UserException(f"FFmpeg is enabled in your configuration but is not installed. "
                                 f"Install FFmpeg or disable FFmpeg in your configuration. "
                                 f"Check the README for more information.")
@@ -54,27 +55,28 @@ class FfmpegStage(PostprocessingStage):
         :return: `None`
         """
 
-        # TODO: Support adding custom FFmpeg path
-        # TODO: Support custom options and filters
-        args = ["ffmpeg"]
+        args = [self.cfg["exe_path"]]
         args += ["-hide_banner"]
         args += ["-loglevel", "error"]
         args += ["-stats"]
         args += ["-y"]
         args += ["-f", "image2"]
         args += ["-r", str(self.cfg["fps"])]
-        args += ["-i", "%d.jpg"]
+        args += self.cfg["custom_global_options"]
+        args += ["-i", f"{frames_dir}/%d.jpg"]
+        args += self.cfg["custom_inputs"]
         args += ["-vcodec", self.cfg["codec"]]
         args += ["-crf", str(self.cfg["crf"])]
         if len(self.cfg["video_filters"]) > 0:
             args += ["-vf", ",".join(self.cfg["video_filters"])]
-        args += [os.path.relpath(self.output_path, frames_dir)]
+        args += self.cfg["custom_output_options"]
+        args += [self.cfg["output_path"]]
 
         print("Combining frames into a video:")
         try:
-            subprocess.run(args, cwd=frames_dir, stderr=sys.stdout, check=True)
+            subprocess.run(args, stderr=sys.stdout, check=True)
 
-            print(f"Your video has been saved in {Path(self.output_path).resolve()}.")
+            print(f"Your video has been saved in {Path(self.cfg['output_path']).resolve()}.")
         except Exception as exception:
             raise UserException("FFmpeg failed to create a video. "
                                 "Read the messages above for more information.", exception) from None

@@ -19,4 +19,3 @@ def load_image(path: Path) -> Image:
         img = ImageOps.exif_transpose(img)
 
     return img
-

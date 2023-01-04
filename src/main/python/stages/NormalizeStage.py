@@ -1,6 +1,7 @@
 import copy
 import math
 import sys
+import warnings
 from pathlib import Path
 from typing import Dict
 
@@ -85,12 +86,17 @@ class NormalizeStage(ProcessingStage):
                 continue
 
             # Validate normalization parameters
-            # TODO: Add a warning at, say, 30 degrees?
-            if math.fabs(math.degrees(angles[img_path])) >= 45.0:
-                raise UserException(f"Image '{img_path}' is rotated by {math.degrees(angles[img_path])}, but "
-                                    f"Facemation only supports angles up to 45 degrees (but preferably much lower). "
+            angle_abs = math.fabs(math.degrees(angles[img_path]))
+            if angle_abs >= 45.0:
+                raise UserException(f"Image '{img_path}' is rotated by {angle_abs} degrees, but Facemation only "
+                                    f"supports angles up to 45 degrees (but preferably much lower). "
                                     f"You should manually rotate the image and crop out the relevant parts, or remove "
                                     f"the image from the inputs altogether.")
+            if angle_abs >= 30.0:
+                warnings.warn(f"Image '{img_path}' is rotated by {angle_abs} degrees, which may cause a very small "
+                              f"output video. "
+                              f"Consider manually cropping out the relevant parts of the image, or removing the image "
+                              f"from the inputs altogether.")
 
             # Normalize image
             translated_dims = tuple(scaled_img_dims[img_path] + translations[img_path])

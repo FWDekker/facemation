@@ -96,19 +96,17 @@ config = {
 ```
 
 #### Adding music
-Using FFmpeg, you can add music to the video after Facemation is done.
-1. Put your music file in the directory that contains `config.py`.
-2. Open a command prompt in the directory where you have `config.py` and run the following command.
-   Replace `audio.mp3` with the actual name of your music file.
-   ```shell
-   ffmpeg -i output/facemation.mp4 -i audio.mp3 -c:v copy -shortest output/facemation-audio.mp4
-   ```
-   Alternatively, if you want the audio to fade out at the end, run
-   ```shell
-   ffmpeg -i output/facemation.mp4 -i audio.mp3 -af "afade=t=out:st=50:d=3" -c:v copy -shortest output/facemation-audio.mp4
-   ```
-   The audio will fade out after 50 seconds, and the fading out will take 3 seconds.
-3. You should now have a file `facemation-audio.mp4` in the `output` directory.
+Put your music file in the directory that contains `config.py`.
+Then, update your configuration as below;
+replace `music.mp3` with the name of your music file.
+```python
+config = {
+    "ffmpeg": {
+        "custom_inputs": ["-i", "music.mp3"],
+        "custom_output_options": ["-map", "0:v", "-map", "1:a", "-shortest"],
+    },
+}
+```
 
 ## Development instructions
 If you are a developer and want to help with or change Facemation, these instructions are for you.
@@ -164,7 +162,7 @@ If you are a developer and want to help with or change Facemation, these instruc
    ```
 5. (_Optional_) Create `config_dev.py` to override both `config_default.py` and `config.py`.
    ```shell
-   cp src/main/python/config_empty.py config_dev.py
+   cp src/main/resources/config_empty.py config_dev.py
    ```
    Note that `config_dev.py` is always searched for in the current working directory.
 

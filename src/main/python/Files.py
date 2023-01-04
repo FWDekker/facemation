@@ -1,7 +1,5 @@
-import glob
 import shutil
 from pathlib import Path
-from typing import List, Sequence
 
 
 def cleardir(path: str) -> None:
@@ -38,17 +36,3 @@ def rm(path: str) -> None:
     """
 
     Path(path).unlink(missing_ok=True)
-
-
-def glob_extensions(root_dir: str, extensions: str) -> List[str]:
-    """
-    Returns all files in [root_dir] with an extension in [extensions], akin to
-    `glob.glob(root_dir + "/{" + extensions + "}")`.
-
-    :param extensions: the extensions to filter, each formatted as `"*.jpg"`
-    :param root_dir: the directory to glob in
-    :return: all files in [root_dir] with an extension in [extensions]
-    """
-
-    extension_list = [f"*.{it}" for it in extensions.split(",")]
-    return [file for files in [glob.glob(root_dir + "/" + it) for it in extension_list] for file in files]

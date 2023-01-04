@@ -2,18 +2,18 @@ import copy
 import os
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, TypedDict
 
+import PIL
+from PIL import Image
 from mergedeep import merge
 from natsort import natsorted
 
 import Files
 from UserException import UserException
 
-"""Information about an image gathered during the execution of the pipeline. During processing and postprocessing, the
-`processed_path` key gives the path to the image as it has been processed thus far. During postprocessing, the
-`frame_path` key gives the path to the fully-processed image identified by its sequential frame number."""
-ImageInfo = Dict[str, Any]
+PipelineConfig = TypedDict("PipelineConfig", {"input_dir": str, "cache_dir": str, "frames_dir": str})
+ImageInfo = Dict[str, Any]  # Contains `processed_path` during processing, and `frame_path` during postprocessing
 
 
 class Stage(ABC):
@@ -128,11 +128,15 @@ class Pipeline:
 
         Files.mkdir(input_dir)
 
-        # TODO: Check how many non-matching files there are; warn if files are skipped
-        img_paths = Files.glob_extensions(input_dir, "bmp,dib,jpeg,jpg,jpe,jp2,png,pbm,pgm,ppm,sr,ras,tiff,tif")
+        img_paths = [it for it in Path(input_dir).iterdir() if it.is_file()]
         if len(img_paths) == 0:
             raise UserException(f"No images detected in '{Path(input_dir).resolve()}'. "
                                 f"Are you sure you put them in the right place?", )
+        for img_path in img_paths:
+            try:
+                Image.open(img_path)
+            except PIL.UnidentifiedImageError:
+                raise UserException(f"Unsupported image type for input '{img_path}'.")
 
         imgs = {Path(it): {} for it in img_paths}
         for stage in self.preprocessing:

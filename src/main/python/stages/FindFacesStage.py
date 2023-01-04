@@ -15,9 +15,10 @@ from ImageLoader import load_image
 from Pipeline import PreprocessingStage, ImageInfo
 from UserException import UserException
 
-Face = np.ndarray  # (x, y)-coordinates of the eyes, with the left-most eye in the picture as the first row
 FaceSelectionOverride = Callable[[dlib.full_object_detection], int]
-FindFacesConfig = TypedDict("FindFacesConfig", {"face_selection_overrides": Dict[str, FaceSelectionOverride]})
+FindFacesConfig = TypedDict("FindFacesConfig", {"error_dir": str,
+                                                "face_selection_overrides": Dict[str, FaceSelectionOverride]})
+Face = np.ndarray  # (x, y)-coordinates of the eyes, with the left-most eye in the picture as the first row
 
 # Global field because this cannot be pickled between parallel processes
 g_face_selection_overrides: Dict[str, FaceSelectionOverride]
@@ -28,25 +29,21 @@ class FindFacesStage(PreprocessingStage):
     Finds faces in the input images.
     """
 
-    error_dir: str
+    cfg: FindFacesConfig
     face_cache: NdarrayCache
-    face_selection_overrides: Dict[str, FaceSelectionOverride]
 
-    def __init__(self, cache_dir: str, error_dir: str, face_selection_overrides: Dict[str, FaceSelectionOverride]):
+    def __init__(self, cfg: FindFacesConfig, cache_dir: str):
         """
         Constructs a new `FindFacesStage`.
 
+        :param cfg: the configuration for this stage
         :param cache_dir: the directory to cache found faces in
-        :param error_dir: the directory to write debugging information in to assist the user
-        :param face_selection_overrides: if multiple faces are found in an image, the file path is used as a key to find
-        the `Callable` by which the faces are sorted, and the first face is used
         """
 
-        Files.cleardir(error_dir)
+        Files.cleardir(cfg["error_dir"])
 
-        self.error_dir = error_dir
+        self.cfg = cfg
         self.face_cache = NdarrayCache(cache_dir, "face", ".cache")
-        self.face_selection_overrides = face_selection_overrides
 
     def preprocess(self, imgs: Dict[Path, ImageInfo]) -> Dict[Path, ImageInfo]:
         """
@@ -62,9 +59,11 @@ class FindFacesStage(PreprocessingStage):
         """
 
         global g_face_selection_overrides
-        g_face_selection_overrides = self.face_selection_overrides
+        g_face_selection_overrides = self.cfg["face_selection_overrides"]
 
-        return dict(process_map(functools.partial(find_face, face_cache=self.face_cache, error_dir=self.error_dir),
+        return dict(process_map(functools.partial(find_face,
+                                                  face_cache=self.face_cache,
+                                                  error_dir=self.cfg["error_dir"]),
                                 imgs.items(),
                                 desc="Detecting faces",
                                 file=sys.stdout))

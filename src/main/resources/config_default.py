@@ -2,21 +2,19 @@
 # which must be in the same directory as the Facemation executable.
 config = {
     # Locations of files. Usually, you don't need to change this.
-    "paths": {
+    "pipeline": {
         # Directory with the original images to process and turn into a video.
-        "input": "input/",
+        "input_dir": "input/",
         # Directory to cache intermediate results in to speed up future runs.
-        "cache": "output/cache/",
-        # Directory to store images in that caused an error.
-        "error": "output/error/",
+        "cache_dir": "output/cache/",
         # Directory to store final frames in.
-        "frames": "output/frames/",
-        # Directory to store created video in.
-        "output": "output/facemation.mp4",
+        "frames_dir": "output/frames/",
     },
 
     # Configure which face is selected in each image.
     "find_faces": {
+        # Directory to store images in that caused an error.
+        "error_dir": "output/error/",
         # Determines which face should be used for normalization if an image contains multiple faces.
         #
         # Add an entry for each image that contains multiple faces. The entry maps the filename of the image (without
@@ -59,6 +57,10 @@ config = {
         # Set to `True` to automatically run FFmpeg at the end. Set this to `False` if you do not have FFmpeg, or if you
         # prefer running FFmpeg with your own settings.
         "enabled": True,
+        # The path to where FFmpeg is installed.
+        "exe_path": "ffmpeg",
+        # Filename to store created video as.
+        "output_path": "output/facemation.mp4",
         # The number of photos per second to show in the output video.
         "fps": 24,
         # The codec to use for the output video. x264 is a very widely supported codec.
@@ -75,5 +77,11 @@ config = {
             # Morphs pictures into each other for a smoother transition effect.
             "minterpolate=fps=60:mi_mode=blend",
         ],
+        # Additional global options to pass to FFmpeg.
+        "custom_global_options": [],
+        # Additional inputs to provide to FFmpeg.
+        "custom_inputs": [],
+        # Additional output options to provide to FFmpeg.
+        "custom_output_options": [],
     }
 }

@@ -2,20 +2,16 @@ from importlib.machinery import SourceFileLoader
 from typing import TypedDict
 
 from mergedeep import merge
-from typeguard import check_return_type
+from typeguard import check_type
 
 import Resolver
+from Pipeline import PipelineConfig
+from UserException import UserException
 from stages.CaptionStage import CaptionConfig
 from stages.FfmpegStage import FfmpegConfig
 from stages.FindFacesStage import FindFacesConfig
 
-PathsConfig = TypedDict("PathsConfig",
-                        {"input": str,
-                         "cache": str,
-                         "error": str,
-                         "frames": str,
-                         "output": str})
-FacemationConfig = TypedDict("FacemationConfig", {"paths": PathsConfig,
+FacemationConfig = TypedDict("FacemationConfig", {"pipeline": PipelineConfig,
                                                   "find_faces": FindFacesConfig,
                                                   "caption": CaptionConfig,
                                                   "ffmpeg": FfmpegConfig})
@@ -26,6 +22,8 @@ def load_config() -> FacemationConfig:
     Loads config from `config_default.py`, overrides it with `config.py` (if it exists) in the same directory as the
     executable that was invoked, and then overrides that with `config_dev.py` (if it exists) in the current working
     directory.
+
+    Throws a [UserException] if the configuration is invalid.
 
     :return: the combined configuration
     """
@@ -46,5 +44,9 @@ def load_config() -> FacemationConfig:
         cfg_dev = {}
 
     cfg = merge({}, cfg_default, cfg_dev, cfg_user)
-    check_return_type(cfg)
+    try:
+        check_type("config", cfg, FacemationConfig)
+    except TypeError as error:
+        raise UserException(f"{error.args[0]}.")
+    # noinspection PyTypeChecker
     return cfg
