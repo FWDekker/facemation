@@ -35,6 +35,9 @@ def main() -> None:
     except UserException as exception:
         print("Error: " + exception.args[0], file=sys.stderr)
 
+    if getattr(sys, "frozen", False):
+        input("Press Enter to close.")
+
 
 if __name__ == "__main__":
     freeze_support()

@@ -1,0 +1,2 @@
+-r build.txt
+staticx==0.13.8

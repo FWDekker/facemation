@@ -158,8 +158,10 @@ venv_build/
 input/
 output/
 
+src/main/resources/*.dll
+src/main/resources/Roboto-Regular.ttf
+src/main/resources/shape_predictor_5_face_landmarks.dat
+
 config_dev.py
 ffmpeg.exe
-shape_predictor_5_face_landmarks.dat
-
 facemation*.zip
