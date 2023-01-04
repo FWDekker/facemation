@@ -17,7 +17,8 @@ mkdir dist/
 mkdir dist/input/
 cp README.md dist/README.txt
 cp src/main/resources/config_empty.py dist/config.py
-pip-licenses --with-license-file --no-license-path --output-file=dist/THIRD_PARTY_LICENSES.txt
+pip-licenses --with-license-file --no-license-path --format=plain-vertical --output-file=dist/THIRD_PARTY_LICENSES.txt
+cat src/main/resources/licenses_extra.txt >> dist/THIRD_PARTY_LICENSES.txt
 if (-not $?) {throw "Failed to extract licenses from dependencies."}
 pyinstaller -y -F `
     --noupx `
