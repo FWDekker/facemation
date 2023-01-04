@@ -15,10 +15,9 @@ from ImageLoader import load_image
 from Pipeline import PreprocessingStage, ImageInfo
 from UserException import UserException
 
-"""A face expressed as the (x, y)-coordinates of the eyes, with the left-most eye in the picture as the first row."""
-Face = np.ndarray
-"""Sorting function for faces to determine which face to select if multiple faces are found."""
+Face = np.ndarray  # (x, y)-coordinates of the eyes, with the left-most eye in the picture as the first row
 FaceSelectionOverride = Callable[[dlib.full_object_detection], int]
+FindFacesConfig = Dict[str, FaceSelectionOverride]
 
 # Global field because this cannot be pickled between parallel processes
 g_face_selection_overrides: Dict[str, FaceSelectionOverride]
@@ -96,7 +95,6 @@ def find_face(img_tuple: Tuple[Path, ImageInfo], face_cache: NdarrayCache, error
 
     # Find face
     img = load_image(img_path)
-    # noinspection PyTypeChecker
     img_np = np.array(img)
     faces = dlib.full_object_detections()
     detections = detector(img_np, 1)

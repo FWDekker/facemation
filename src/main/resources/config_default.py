@@ -11,8 +11,8 @@ config = {
         "error": "output/error/",
         # Directory to store final frames in.
         "frames": "output/frames/",
-        # Directory to store created video in, relative to `frames`.
-        "output": "../facemation.mp4",
+        # Directory to store created video in.
+        "output": "output/facemation.mp4",
     },
 
     # Determines which face should be used for normalization if an image contains multiple faces.

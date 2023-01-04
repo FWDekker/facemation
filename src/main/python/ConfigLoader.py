@@ -1,11 +1,24 @@
 from importlib.machinery import SourceFileLoader
-from typing import Any
+from typing import TypedDict
 
 from mergedeep import merge
+from typeguard import check_return_type
 
 import Resolver
+from stages.CaptionStage import CaptionConfig
+from stages.DemuxStage import DemuxConfig
+from stages.FindFacesStage import FindFacesConfig
 
-FacemationConfig = Any
+PathsConfig = TypedDict("PathsConfig",
+                        {"input": str,
+                         "cache": str,
+                         "error": str,
+                         "frames": str,
+                         "output": str})
+FacemationConfig = TypedDict("FacemationConfig", {"paths": PathsConfig,
+                                                  "face_selection_overrides": FindFacesConfig,
+                                                  "caption": CaptionConfig,
+                                                  "demux": DemuxConfig})
 
 
 def load_config() -> FacemationConfig:
@@ -20,7 +33,6 @@ def load_config() -> FacemationConfig:
     cfg_default_path = Resolver.resource_path("config_default.py")
     cfg_default = SourceFileLoader("cfg_default", str(cfg_default_path)).load_module().config
 
-    # TODO: Validate types, so that using int where str is required still works
     cfg_user_path = Resolver.exe_relative_path("config.py")
     if cfg_user_path.exists():
         cfg_user = SourceFileLoader("cfg_user", str(cfg_user_path.resolve())).load_module().config
@@ -33,4 +45,6 @@ def load_config() -> FacemationConfig:
     else:
         cfg_dev = {}
 
-    return merge({}, cfg_default, cfg_dev, cfg_user)
+    cfg = merge({}, cfg_default, cfg_dev, cfg_user)
+    check_return_type(cfg)
+    return cfg

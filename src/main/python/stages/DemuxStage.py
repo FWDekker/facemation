@@ -1,13 +1,19 @@
+import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict
+from typing import Dict, TypedDict, List, Union
 
 import Files
-from ConfigLoader import FacemationConfig
 from Pipeline import PostprocessingStage, ImageInfo
 from UserException import UserException
+
+DemuxConfig = TypedDict("DemuxConfig", {"enabled": bool,
+                                        "fps": Union[str, int],
+                                        "codec": str,
+                                        "crf": Union[str, int],
+                                        "video_filters": List[str]})
 
 
 class DemuxStage(PostprocessingStage):
@@ -16,9 +22,9 @@ class DemuxStage(PostprocessingStage):
     """
 
     output_path: str
-    cfg: FacemationConfig
+    cfg: DemuxConfig
 
-    def __init__(self, output_path: str, cfg: FacemationConfig):
+    def __init__(self, output_path: str, cfg: DemuxConfig):
         """
         Constructs a new `DemuxStage`.
 
@@ -49,23 +55,23 @@ class DemuxStage(PostprocessingStage):
         :return: `None`
         """
 
+        args = ["ffmpeg"]
+        args += ["-hide_banner"]
+        args += ["-loglevel", "error"]
+        args += ["-stats"]
+        args += ["-y"]
+        args += ["-f", "image2"]
+        args += ["-r", str(self.cfg["fps"])]
+        args += ["-i", "%d.jpg"]
+        args += ["-vcodec", self.cfg["codec"]]
+        args += ["-crf", str(self.cfg["crf"])]
+        if len(self.cfg["video_filters"]) > 0:
+            args += ["-vf", ",".join(self.cfg["video_filters"])]
+        args += [os.path.relpath(self.output_path, frames_dir)]
+
         print("Demuxing into video:")
         try:
-            # TODO: Support empty list of filters
-            subprocess.run([
-                "ffmpeg",
-                "-hide_banner",
-                "-loglevel", "error",
-                "-stats",
-                "-y",
-                "-f", "image2",
-                "-r", self.cfg["fps"],
-                "-i", "%d.jpg",
-                "-vcodec", self.cfg["codec"],
-                "-crf", self.cfg["crf"],
-                "-vf", ",".join(self.cfg["video_filters"]),
-                self.output_path
-            ], cwd=frames_dir, stderr=sys.stdout, check=True)
+            subprocess.run(args, cwd=frames_dir, stderr=sys.stdout, check=True)
         except Exception as exception:
             raise UserException("FFmpeg failed to create a video. "
                                 "Read the messages above for more information.", exception) from None

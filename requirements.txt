@@ -7,3 +7,4 @@ pip-licenses==4.0.3
 pyinstaller==5.7.0
 staticx==0.13.8
 tqdm==4.64.1
+typeguard==2.13.3

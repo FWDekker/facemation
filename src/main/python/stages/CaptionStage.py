@@ -1,7 +1,7 @@
 import copy
 import sys
 from pathlib import Path
-from typing import Callable, Dict
+from typing import Callable, Dict, TypedDict
 
 from PIL import ImageDraw, ImageFont
 from tqdm import tqdm
@@ -12,6 +12,10 @@ from Cache import ImageCache
 from ImageLoader import load_image
 from Pipeline import ImageInfo, ProcessingStage
 
+CaptionGenerator = Callable[[str], str]
+CaptionConfig = TypedDict("CaptionConfig", {"enabled": bool,
+                                            "generator": CaptionGenerator})
+
 
 class CaptionStage(ProcessingStage):
     """
@@ -19,9 +23,9 @@ class CaptionStage(ProcessingStage):
     """
 
     captioned_cache: ImageCache
-    caption_generator: Callable[[str], str]
+    caption_generator: CaptionGenerator
 
-    def __init__(self, cache_dir: str, caption_generator: Callable[[str], str]):
+    def __init__(self, cache_dir: str, caption_generator: CaptionGenerator):
         """
         Constructs a new `CaptionStage`.
 
