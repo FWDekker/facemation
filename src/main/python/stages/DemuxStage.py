@@ -51,6 +51,7 @@ class DemuxStage(PostprocessingStage):
 
         print("Demuxing into video:")
         try:
+            # TODO: Support empty list of filters
             subprocess.run([
                 "ffmpeg",
                 "-hide_banner",

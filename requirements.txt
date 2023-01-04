@@ -5,4 +5,5 @@ numpy==1.24.1
 Pillow==9.4.0
 pip-licenses==4.0.3
 pyinstaller==5.7.0
+staticx==0.13.8
 tqdm==4.64.1

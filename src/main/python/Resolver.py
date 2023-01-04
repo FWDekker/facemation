@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -22,7 +23,10 @@ def exe_relative_path(relative_path: str) -> Path:
     """
 
     if getattr(sys, "frozen", False):
-        base_path = Path(sys.executable).parent
+        if "STATICX_PROG_PATH" in os.environ:
+            base_path = Path(os.environ["STATICX_PROG_PATH"]).parent
+        else:
+            base_path = Path(sys.executable).parent
     else:
         base_path = Path(__file__).parent
 

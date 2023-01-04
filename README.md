@@ -36,11 +36,13 @@ compiles these frames into a timelapse.
 ## Development
 ### Requirements
 * [Python 3.10](https://www.python.org/) (invoked as `python`)
+* [shape_predictor_5_face_landmarks.dat](http://dlib.net/files/shape_predictor_5_face_landmarks.dat.bz2)
+  (store in `src/main/python/resources/`)
 * [venv](https://docs.python.org/3/tutorial/venv.html)
 * [CMake](https://cmake.org/) (required to build `dlib`)
 * C++ compiler (required to build `dlib`)
-* [shape_predictor_5_face_landmarks.dat](http://dlib.net/files/shape_predictor_5_face_landmarks.dat.bz2)
-  (store in `src/main/python/resources/`)
+  (Debian: `apt install g++`.
+  Windows: [Visual C++ build tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/))
 
 ### Run script for development
 #### Setup
@@ -84,10 +86,15 @@ compiles these frames into a timelapse.
    ```
 
 ### Build distribution
-1. Check that you satisfy the development requirements.
+#### Distribution requirements
+* (_Linux only_) [Requirements for `staticx](https://staticx.readthedocs.io/en/latest/installation.html)
+
+#### Usage
+1. Check that you satisfy the development and the extra requirements.
    On Windows, always use PowerShell.
-2. Check version number in the `version` file.
-3. Build executable into `dist/` and create `.zip` distribution:
+2. Check the version number in the `version` file.
+3. Check that `config_empty.py` is up-to-date with `config_default.py`.
+4. Build executable into `dist/` and create `.zip` distribution:
    * Linux
      ```shell
      ./build_linux.sh
@@ -96,7 +103,7 @@ compiles these frames into a timelapse.
      ```shell
      ./build_windows.ps1
      ```
-4. Run executable:
+5. Run executable:
    ```shell
    dist/facemation
    ```
