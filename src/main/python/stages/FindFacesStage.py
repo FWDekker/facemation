@@ -1,8 +1,10 @@
 import functools
+import math
 import sys
 from pathlib import Path
 from typing import Dict, Tuple, Callable, TypedDict
 
+import dill as dill
 import dlib
 import numpy as np
 from PIL import ImageDraw
@@ -19,9 +21,6 @@ FaceSelectionOverride = Callable[[dlib.full_object_detection], int]
 FindFacesConfig = TypedDict("FindFacesConfig", {"error_dir": str,
                                                 "face_selection_overrides": Dict[str, FaceSelectionOverride]})
 Face = np.ndarray  # (x, y)-coordinates of the eyes, with the left-most eye in the picture as the first row
-
-# Global field because this cannot be pickled between parallel processes
-g_face_selection_overrides: Dict[str, FaceSelectionOverride]
 
 
 class FindFacesStage(PreprocessingStage):
@@ -58,18 +57,19 @@ class FindFacesStage(PreprocessingStage):
         :return: a mapping from original input path to the face in the image
         """
 
-        global g_face_selection_overrides
-        g_face_selection_overrides = self.cfg["face_selection_overrides"]
-
         return dict(process_map(functools.partial(find_face,
                                                   face_cache=self.face_cache,
+                                                  face_selection_overrides=dill.dumps(
+                                                      self.cfg["face_selection_overrides"], recurse=True),
                                                   error_dir=self.cfg["error_dir"]),
                                 imgs.items(),
                                 desc="Detecting faces",
+                                chunksize=math.ceil(len(imgs) / 250),
                                 file=sys.stdout))
 
 
-def find_face(img_tuple: Tuple[Path, ImageInfo], face_cache: NdarrayCache, error_dir: str) -> Tuple[Path, ImageInfo]:
+def find_face(img_tuple: Tuple[Path, ImageInfo], face_cache: NdarrayCache, face_selection_overrides: bytes,
+              error_dir: str) -> Tuple[Path, ImageInfo]:
     """
     Finds the face in [img_tuple], expressed as the positions of the eyes, caching the face data in [face_cache].
 
@@ -79,6 +79,8 @@ def find_face(img_tuple: Tuple[Path, ImageInfo], face_cache: NdarrayCache, error
 
     :param img_tuple: the original input path and the pre-processing data of the image to find a face in
     :param face_cache: the cache to store the found face in
+    :param face_selection_overrides: dill serialization of dictionary from image names to sorting function to select
+    which face to use in case an image has multiple faces
     :param error_dir: the directory to write debugging information in to assist the user
     :return: the original input path and the found face
     """
@@ -88,7 +90,7 @@ def find_face(img_tuple: Tuple[Path, ImageInfo], face_cache: NdarrayCache, error
         return img_path, {"eyes": face_cache.load(img_data["hash"])}
 
     # Initialize face recognition
-    global g_face_selection_overrides
+    face_selection_overrides = dill.loads(face_selection_overrides)
     detector = dlib.get_frontal_face_detector()
     shape_predictor = dlib.shape_predictor(str(Resolver.resource_path("shape_predictor_5_face_landmarks.dat")))
 
@@ -108,15 +110,15 @@ def find_face(img_tuple: Tuple[Path, ImageInfo], face_cache: NdarrayCache, error
     else:
         img_name = img_path.name  # Includes file extension
 
-        if img_name in g_face_selection_overrides:
-            face = sorted(list(faces), key=g_face_selection_overrides[img_name])[0]
+        if img_name in face_selection_overrides:
+            face = sorted(list(faces), key=face_selection_overrides[img_name])[0]
         else:
             img_draw = ImageDraw.Draw(img)
 
             bb = [it.rect for it in faces]
             bb = [((it.left(), it.top()), (it.right(), it.bottom())) for it in bb]
             for it in bb:
-                img_draw.rectangle(it[0], it[1], (255, 0, 0), 5)
+                img_draw.rectangle((it[0], it[1]), outline=(255, 0, 0))
 
             img.save(f"{error_dir}/{img_name}")
 

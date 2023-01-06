@@ -208,3 +208,9 @@ If you are a developer and want to help with or change Facemation, these instruc
    ```shell
    dist/facemation
    ```
+
+## Acknowledgements
+In chronological order of contribution:
+* Thanks to [Luc Everse](https://github.com/cmpsb) for finding a bunch of bugs in v1.0.0!
+
+If I should add, remove, or change anything here, just open an issue or email me!
