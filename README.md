@@ -114,9 +114,9 @@ If you are a developer and want to help with or change Facemation, these instruc
 ### Requirements
 #### All systems
 * [`shape_predictor_5_face_landmarks.dat`](http://dlib.net/files/shape_predictor_5_face_landmarks.dat.bz2)
-  (extract and store in `src/main/python/resources/`)
+  (extract and store in `src/main/resources/`)
 * [`Roboto-Regular.ttf`](https://fonts.google.com/specimen/Roboto)
-  (extract and store in `src/main/python/resources/`)
+  (extract and store in `src/main/resources/`)
 
 #### Linux
 * [Python 3.10](https://www.python.org/)  
