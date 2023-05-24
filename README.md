@@ -120,7 +120,7 @@ If you are a developer and want to help with or change Facemation, these instruc
   (extract and store in `src/main/resources/`)
 
 ##### Linux
-* [Python 3.10](https://www.python.org/) (Python 3.11 currently does not work)  
+* [Python 3.11](https://www.python.org/) or newer  
   The commands in this README invoke Python as `python`.
   Use `python3` instead if you have not linked `python` to `python3`.
 * [venv](https://docs.python.org/3/tutorial/venv.html)  
