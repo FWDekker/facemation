@@ -60,7 +60,13 @@ if __name__ == "__main__":
     try:
         sys.excepthook = excepthook
 
+        if len(sys.argv) > 1:
+            raise UserException("Facemation does not support command-line arguments. "
+                                "To configure Facemation, edit the config.py file. "
+                                "Check the README for more information.")
+
         freeze_support()
         main()
     except UserException as exception:
         print(f"Error: {exception.args[0]}\n\n{error_info}", file=sys.stderr)
+        sys.exit(2)
