@@ -49,7 +49,7 @@ All intermediate results are heavily cached, so subsequent runs are much faster.
 ### How to configure
 You can change how Facemation behaves by editing the `config.py` file.
 Below are some examples of how you can configure Facemation.
-Check [`config_default.py`](https://github.com/FWDekker/facemation/blob/master/src/main/resources/config_default.py) for
+Check [`config_default.py`](https://github.com/FWDekker/facemation/blob/main/src/main/resources/config_default.py) for
 a list of all options.
 
 #### Disable FFmpeg
@@ -111,15 +111,16 @@ config = {
 ## Development instructions
 If you are a developer and want to help with or change Facemation, these instructions are for you.
 
-### Requirements
-#### All systems
+### Run script for development
+#### Requirements
+##### All systems
 * [`shape_predictor_5_face_landmarks.dat`](http://dlib.net/files/shape_predictor_5_face_landmarks.dat.bz2)
   (extract and store in `src/main/resources/`)
 * [`Roboto-Regular.ttf`](https://fonts.google.com/specimen/Roboto)
   (extract and store in `src/main/resources/`)
 
-#### Linux
-* [Python 3.10](https://www.python.org/)  
+##### Linux
+* [Python 3.10](https://www.python.org/) (Python 3.11 currently does not work)  
   The commands in this README invoke Python as `python`.
   Use `python3` instead if you have not linked `python` to `python3`.
 * [venv](https://docs.python.org/3/tutorial/venv.html)  
@@ -131,15 +132,14 @@ If you are a developer and want to help with or change Facemation, these instruc
 * C++ compiler (required to build `dlib`)  
   On Debian/Ubuntu, install with `apt install g++`.
 
-#### Windows 10/11
-* Always use PowerShell.
+##### Windows 10/11
+* Always use PowerShell
 * [Python 3.10](https://www.python.org/)
 * [CMake](https://cmake.org/) (required to build `dlib`)
 * C++ compiler (required to build `dlib`)  
   You will need either Visual Studio (an editor) or Visual Studio Tools (a library).
   You can find both on the [Visual Studio downloads page](https://visualstudio.microsoft.com/downloads/).
 
-### Run script for development
 #### Setup
 1. Check that you satisfy the development requirements.
 2. Create a [venv](https://docs.python.org/3/tutorial/venv.html):
@@ -191,11 +191,46 @@ If you are a developer and want to help with or change Facemation, these instruc
   Note that the `[version]` in the path differs per system.
   I don't know what the implications of this are.
 
-#### Usage
+#### Setup
+1. Create a [venv](https://docs.python.org/3/tutorial/venv.html):
+   ```shell
+   python -m venv venv/
+   ```
+2. Activate the venv:
+    * Linux
+      ```shell
+      source venv/bin/activate
+      ```
+    * Windows PowerShell
+      ```shell
+      ./venv/Scripts/activate
+      ```
+3. Install dependencies:
+    * Linux
+      ```shell
+      python -m pip install -r requirements/build_linux.txt
+      ```
+    * Windows PowerShell
+      ```shell
+      python -m pip install -r requirements/build_windows.txt
+      ```
+
+#### Pre-flight checks
 1. Check that you satisfy the distribution requirements.
 2. Check the version number in the `version` file.
 3. Check that `config_empty.py` is up-to-date with `config_default.py`.
-4. Build executable into `dist/` and create `.zip` distribution:
+
+#### Usage
+1. Activate the venv:
+    * Linux
+      ```shell
+      source venv/bin/activate
+      ```
+    * Windows PowerShell
+      ```shell
+      ./venv/Scripts/activate
+      ```
+2. Build executable into `dist/` and create `.zip` distribution:
     * Linux
       ```shell
       ./build_linux.sh
@@ -204,7 +239,7 @@ If you are a developer and want to help with or change Facemation, these instruc
       ```shell
       ./build_windows.ps1
       ```
-5. Run executable:
+3. Run executable:
    ```shell
    dist/facemation
    ```
