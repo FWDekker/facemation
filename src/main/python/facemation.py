@@ -44,13 +44,13 @@ def main() -> None:
     pipeline = Pipeline()
     pipeline.register(ReadMetadataStage())
     pipeline.register(FindFacesStage(cfg["find_faces"], cfg["pipeline"]["cache_dir"]))
-    pipeline.register(NormalizeStage(cfg["pipeline"]["cache_dir"]))
+    pipeline.register(NormalizeStage(0, 0, cfg["pipeline"]["cache_dir"]))
     if cfg["caption"]["enabled"]:
-        pipeline.register(CaptionStage(cfg["pipeline"]["cache_dir"], cfg["caption"]["generator"]))
+        pipeline.register(CaptionStage(1, cfg["pipeline"]["cache_dir"], cfg["caption"]["generator"]))
     if cfg["ffmpeg"]["enabled"]:
-        pipeline.register(FfmpegStage(cfg["ffmpeg"]))
+        pipeline.register(FfmpegStage([0, 1], cfg["ffmpeg"]))
 
-    pipeline.run(cfg["pipeline"]["input_dir"], cfg["pipeline"]["frames_dir"])
+    pipeline.run(cfg["pipeline"]["input_dir"])
 
     if getattr(sys, "frozen", False):
         input("Press Enter to close.")

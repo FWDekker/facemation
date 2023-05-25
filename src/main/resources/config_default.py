@@ -7,8 +7,6 @@ config = {
         "input_dir": "input/",
         # Directory to cache intermediate results in to speed up future runs.
         "cache_dir": "output/cache/",
-        # Directory to store final frames in.
-        "frames_dir": "output/frames/",
     },
 
     # Configure which face is selected in each image.
@@ -59,6 +57,8 @@ config = {
         "enabled": True,
         # The path to where FFmpeg is installed.
         "exe_path": "ffmpeg",
+        # Directory to store final frames in.
+        "frames_dir": "output/frames/",
         # Filename to store created video as.
         "output_path": "output/facemation.mp4",
         # The number of photos per second to show in the output video.

@@ -1,15 +1,19 @@
+import glob
+import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
-from typing import Dict, TypedDict, List, Union
+from typing import List, TypedDict, Union
 
 import Files
-from Pipeline import PostprocessingStage, ImageInfo
+from Pipeline import Frame, Stage
 from UserException import UserException
 
 FfmpegConfig = TypedDict("FfmpegConfig", {"enabled": bool,
                                           "exe_path": str,
+                                          "frames_dir": str,
                                           "output_path": str,
                                           "fps": Union[str, int],
                                           "codec": str,
@@ -20,14 +24,15 @@ FfmpegConfig = TypedDict("FfmpegConfig", {"enabled": bool,
                                           "custom_output_options": List[str]})
 
 
-class FfmpegStage(PostprocessingStage):
+class FfmpegStage(Stage):
     """
     Demuxes the processed frames into a video.
     """
 
+    layers_in: List[int]
     cfg: FfmpegConfig
 
-    def __init__(self, cfg: FfmpegConfig):
+    def __init__(self, layers_in: List[int], cfg: FfmpegConfig):
         """
         Constructs a new `FfmpegStage`.
 
@@ -38,6 +43,7 @@ class FfmpegStage(PostprocessingStage):
 
         Files.rm(cfg["output_path"])
 
+        self.layers_in = layers_in
         self.cfg = cfg
 
         if (not Path(cfg["exe_path"]).exists()) and (shutil.which("ffmpeg") is None):
@@ -45,16 +51,17 @@ class FfmpegStage(PostprocessingStage):
                                 f"Install FFmpeg or disable FFmpeg in your configuration. "
                                 f"Check the README for more information.")
 
-    def postprocess(self, imgs: Dict[Path, ImageInfo], frames_dir: str) -> None:
-        """
-        Demuxes the images in [frames_dir] into a video in [self.output_path] using FFmpeg, subject to [self.cfg].
+    def prepare_frames(self, frames: List[Frame]) -> None:
+        Files.cleardir(self.cfg["frames_dir"])
+        Files.mkdir(self.cfg["frames_dir"])
 
-        :param imgs: a read-only mapping from original input paths to the preprocessed data and the processed output
-        path
-        :param frames_dir: the directory containing exactly all processed images
-        :return: `None`
-        """
+        for idx, frame in enumerate(frames):
+            for layer_in in self.layers_in:
+                img_path = frame["layers"][layer_in]
+                link_path = f"{self.cfg['frames_dir']}/{idx}-{layer_in}{Path(img_path).suffix}"
+                os.link(img_path, Path(link_path).resolve())
 
+    def create_args(self) -> List[str]:
         args = [self.cfg["exe_path"]]
         args += ["-hide_banner"]
         args += ["-loglevel", "error"]
@@ -63,8 +70,11 @@ class FfmpegStage(PostprocessingStage):
         args += ["-f", "image2"]
         args += ["-r", str(self.cfg["fps"])]
         args += self.cfg["custom_global_options"]
-        args += ["-i", f"{frames_dir}/%d.jpg"]
-        args += self.cfg["custom_inputs"]
+        for layer_in in self.layers_in:
+            # TODO: Detect extension better!
+            extension = Path(glob.glob(f"{self.cfg['frames_dir']}/*-{layer_in}.*")[0]).suffix
+            args += ["-i", f"{self.cfg['frames_dir']}/%d-{layer_in}{extension}"]
+            args += self.cfg["custom_inputs"]
         args += ["-vcodec", self.cfg["codec"]]
         args += ["-crf", str(self.cfg["crf"])]
         if len(self.cfg["video_filters"]) > 0:
@@ -72,7 +82,20 @@ class FfmpegStage(PostprocessingStage):
         args += self.cfg["custom_output_options"]
         args += [self.cfg["output_path"]]
 
+        return args
+
+    def process(self, frames: List[Frame]) -> List[Frame]:
+        """
+        Demuxes layers [self.layers_in] of all [frames] into a video using FFmpeg, subject to [self.cfg].
+
+        :param frames: the frames to demux
+        :return: [frames], unmodified
+        """
+
         print("Combining frames into a video:")
+        self.prepare_frames(frames)
+        args = self.create_args()
+
         try:
             subprocess.run(args, stderr=sys.stdout, check=True)
 
@@ -80,3 +103,5 @@ class FfmpegStage(PostprocessingStage):
         except Exception as exception:
             raise UserException("FFmpeg failed to create a video. "
                                 "Read the messages above for more information.", exception) from None
+
+        return frames

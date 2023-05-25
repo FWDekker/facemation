@@ -52,7 +52,7 @@ class Cache(ABC, Generic[T]):
         :return: the path to the data cached under [key] and [state]
         """
 
-        return Path(f"{self.directory}/{self.prefix}-{key}-{state}{self.suffix}")
+        return Path(f"{self.directory}/{self.prefix}-{key}-{state}{self.suffix}").resolve()
 
     def path_all(self, key: str) -> List[Path]:
         """

@@ -1,81 +1,43 @@
-import copy
-import os
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Dict, Any, TypedDict
+from typing import Any, Dict, List, TypedDict
 
 import PIL
 from PIL import Image
-from mergedeep import merge
 from natsort import natsorted
 
 import Files
 from UserException import UserException
 
-PipelineConfig = TypedDict("PipelineConfig", {"input_dir": str, "cache_dir": str, "frames_dir": str})
-ImageInfo = Dict[str, Any]  # Contains `processed_path` during processing, and `frame_path` during postprocessing
+PipelineConfig = TypedDict("PipelineConfig", {"input_dir": str, "cache_dir": str})
+
+# `Frame` contains (meta)data for an image. Various stages add, remove, and modify the contents of a `Frame`. However,
+# the following keys always exist:
+# * `"path"` is the original input image's absolute path
+# * `"layers"` is a dictionary of the layer name to the absolute path of the corresponding image
+# A `Frame` typically does not contain images directly, but only paths to the images. When a stage alters an image, it
+# will typically write the altered image into a new file, and point the path in the `Frame` to this new file.
+Frame = Dict[str, Any]
 
 
 class Stage(ABC):
     """
-    A part of the [Pipeline].
-    """
+    Processes the list of frames.
 
+    Stages can perform any arbitrary processing, including any combination of adding or removing metadata, adding or
+    dropping frames, adding or dropping layers, and so on.
 
-class PreprocessingStage(Stage):
-    """
-    Performs calculations based exclusively on the input images, to be used by later processing steps.
-
-    Preprocessing stages can depend on each other.
-    """
-
-    @abstractmethod
-    def preprocess(self, imgs: Dict[Path, ImageInfo]) -> Dict[Path, ImageInfo]:
-        """
-        Preprocesses the images in [imgs] and returns new data.
-
-        :param imgs: a read-only mapping from original input paths to the preprocessed data obtained thus far
-        :return: a mapping from original input path to the new data, to be merged into [imgs]
-        """
-
-        pass
-
-
-class ProcessingStage(Stage):
-    """
-    Processes images into new images.
-
-    Processing stages are typically chained together.
+    Stages can be linked together by specifying in- and output layers in the stage's constructor. By default, a stage
+    reads from and writes to layer `0`.
     """
 
     @abstractmethod
-    def process(self, imgs: Dict[Path, ImageInfo]) -> Dict[Path, ImageInfo]:
+    def process(self, frames: List[Frame]) -> List[Frame]:
         """
-        Processes the images in [imgs] into new images.
+        Processes the [frames] in some way.
 
-        :param imgs: a read-only mapping from original input paths to the preprocessed data and the processed input path
-        :return: a copy of [imgs] with `"processed_path"` pointing to the newly processed images
-        """
-
-        pass
-
-
-class PostprocessingStage(Stage):
-    """
-    Turns processed images into some desired output.
-
-    Postprocessing stages do not chain information to each other.
-    """
-
-    @abstractmethod
-    def postprocess(self, imgs: Dict[Path, ImageInfo], frames_dir: str) -> None:
-        """
-        Postprocesses the images in [imgs] into some desired output.
-
-        :param imgs: a read-only mapping from original input paths to the preprocessed data and the processed output
-        path
-        :param frames_dir: the directory containing exactly all processed images
-        :return: `None`
+        :param frames: the frames to process; may be modified
+        :return: the processed frame; may be the same instance as [frames]
         """
 
         pass
@@ -83,21 +45,17 @@ class PostprocessingStage(Stage):
 
 class Pipeline:
     """
-    A pipeline describing a sequential three-phase processing of input images.
+    A sequence of [Stage]s to process on a specified directory.
     """
 
-    preprocessing: List[PreprocessingStage]
-    processing: List[ProcessingStage]
-    postprocessing: List[PostprocessingStage]
+    stages: List[Stage]
 
     def __init__(self):
         """
         Constructs a new `Pipeline`.
         """
 
-        self.preprocessing = []
-        self.processing = []
-        self.postprocessing = []
+        self.stages = []
 
     def register(self, stage: Stage) -> None:
         """
@@ -109,90 +67,45 @@ class Pipeline:
         :return: `None`
         """
 
-        if isinstance(stage, PreprocessingStage):
-            self.preprocessing.append(stage)
-        elif isinstance(stage, ProcessingStage):
-            self.processing.append(stage)
-        elif isinstance(stage, PostprocessingStage):
-            self.postprocessing.append(stage)
+        self.stages.append(stage)
 
-    def preprocess(self, input_dir: str) -> Dict[Path, ImageInfo]:
+    @staticmethod
+    def read_dir(input_dir: str) -> List[Frame]:
         """
-        Executes all [self.preprocessing] stages and returns the obtained data.
+        Reads the input directory and returns the list of `Frame`s to process.
 
-        Raises a [UserException] if no supported images are found in [input_dir].
+        Raises a [UserException] if [input_dir] is empty, or if [input_dir] contains an unsupported image.
 
-        :param input_dir: the directory containing the images to preprocess
-        :return: a mapping from original input path to the preprocessed data
+        :param input_dir: the directory containing the images to process
+        :return: `None`
         """
 
         Files.mkdir(input_dir)
+        img_paths = [str(it.resolve()) for it in Path(input_dir).iterdir() if it.is_file()]
 
-        img_paths = [it for it in Path(input_dir).iterdir() if it.is_file()]
         if len(img_paths) == 0:
             raise UserException(f"No images detected in '{Path(input_dir).resolve()}'. "
-                                f"Are you sure you put them in the right place?", )
-        for img_path in img_paths:
+                                f"Are you sure you put them in the right place?")
+
+        for it in img_paths:
             try:
-                Image.open(img_path)
+                Image.open(it)
             except PIL.UnidentifiedImageError:
-                raise UserException(f"Unsupported image type for input '{img_path}'.")
+                raise UserException(f"Unsupported image type for input '{it}'.")
 
-        imgs = {Path(it): {} for it in img_paths}
-        for stage in self.preprocessing:
-            merge(imgs, stage.preprocess(copy.deepcopy(imgs)))
-        return imgs
+        return [{"path": it, "layers": {0: it}} for it in natsorted(img_paths)]
 
-    def process(self, imgs: Dict[Path, ImageInfo], frames_dir: str) -> Dict[Path, ImageInfo]:
-        """
-        Executes the [self.processing] stage and returns the cache containing the outputs.
-
-        :param imgs: a read-only mapping from original input paths to the preprocessed data and the processed input path
-        :param frames_dir: the directory to store processed images in
-        :return: a copy of [imgs] with `"processed_path"` pointing to the newly processed images
-        """
-
-        Files.cleardir(frames_dir)
-
-        processed_imgs = copy.deepcopy(imgs)
-        for img_path in list(processed_imgs.keys()):
-            processed_imgs[img_path]["processed_path"] = img_path
-
-        for stage in self.processing:
-            processed_imgs = stage.process(copy.deepcopy(processed_imgs))
-
-        for idx, img_path in enumerate(natsorted(processed_imgs.keys())):
-            frame_path = f"{frames_dir}/{idx}.jpg"
-            os.link(processed_imgs[img_path]["processed_path"].resolve(), frame_path)
-            processed_imgs[img_path]["frame_path"] = frame_path
-
-        return processed_imgs
-
-    def postprocess(self, imgs: Dict[Path, ImageInfo], frames_dir: str) -> None:
-        """
-        Executes each of the [self.postprocessing] stages in sequence on each other's outputs, starting with the outputs
-        in [input_cache].
-
-        :param imgs: a read-only mapping from original input paths to the preprocessed data and the processed output
-        path
-        :param frames_dir: the directory containing exactly all processed images
-        :return: `None`
-        """
-
-        for stage in self.postprocessing:
-            stage.postprocess(copy.deepcopy(imgs), frames_dir)
-
-    def run(self, input_dir: str, frames_dir: str) -> None:
+    def run(self, input_dir: str) -> None:
         """
         Runs the pipeline from start to end.
 
-        Raises a [UserException] if no supported images are found in [input_dir].
+        Raises a [UserException] if [input_dir] is empty, if [input_dir] contains an unsupported image, or if any stage
+        raises a [UserException].
 
         :param input_dir: the directory containing the images to process
-        :param frames_dir: the directory to store processed frames in
         :return: `None`
         """
 
-        imgs = self.preprocess(input_dir)
-        imgs = self.process(imgs, frames_dir)
-        self.postprocess(imgs, frames_dir)
+        frames = self.read_dir(input_dir)
+        for stage in self.stages:
+            frames = stage.process(frames)

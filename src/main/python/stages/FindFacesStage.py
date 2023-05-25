@@ -1,8 +1,7 @@
 import functools
 import math
 import sys
-from pathlib import Path
-from typing import Dict, Tuple, Callable, TypedDict
+from typing import Callable, Dict, List, TypedDict
 
 import dill as dill
 import dlib
@@ -14,7 +13,7 @@ import Files
 import Resolver
 from Cache import NdarrayCache
 from ImageLoader import load_image
-from Pipeline import PreprocessingStage, ImageInfo
+from Pipeline import Frame, Stage
 from UserException import UserException
 
 FaceSelectionOverride = Callable[[dlib.full_object_detection], int]
@@ -23,7 +22,7 @@ FindFacesConfig = TypedDict("FindFacesConfig", {"error_dir": str,
 Face = np.ndarray  # (x, y)-coordinates of the eyes, with the left-most eye in the picture as the first row
 
 
-class FindFacesStage(PreprocessingStage):
+class FindFacesStage(Stage):
     """
     Finds faces in the input images.
     """
@@ -44,50 +43,52 @@ class FindFacesStage(PreprocessingStage):
         self.cfg = cfg
         self.face_cache = NdarrayCache(cache_dir, "face", ".cache")
 
-    def preprocess(self, imgs: Dict[Path, ImageInfo]) -> Dict[Path, ImageInfo]:
+    def process(self, frames: List[Frame]) -> List[Frame]:
         """
-        Finds one face in each image in [imgs], with each face expressed as the positions of the eyes, additionally
-        caching the face data in [self.face_cache].
+        Finds on face in each frame in [frames], with each face expressed as the positions of the eyes, writing the
+        coordinates into key `"eyes"`, additionally caching the face data in [self.face_cache].
 
         Raises a [UserException] if no or multiple faces are found in an image, and override is configured in
         [self.face_selection_overrides]. Additionally, if an exception is thrown, the image is written to
         [self.error_dir] with debugging information.
 
-        :param imgs: a read-only mapping from original input paths to the preprocessed data obtained thus far
-        :return: a mapping from original input path to the face in the image
+        :param frames: the frames to process
+        :return: `None`
         """
 
-        return dict(process_map(functools.partial(find_face,
-                                                  face_cache=self.face_cache,
-                                                  face_selection_overrides=dill.dumps(
-                                                      self.cfg["face_selection_overrides"], recurse=True),
-                                                  error_dir=self.cfg["error_dir"]),
-                                imgs.items(),
-                                desc="Detecting faces",
-                                chunksize=math.ceil(len(imgs) / 250),
-                                file=sys.stdout))
+        return process_map(functools.partial(find_face,
+                                             face_cache=self.face_cache,
+                                             face_selection_overrides=dill.dumps(
+                                                 self.cfg["face_selection_overrides"], recurse=True),
+                                             error_dir=self.cfg["error_dir"]),
+                           frames,
+                           desc="Detecting faces",
+                           chunksize=math.ceil(len(frames) / 250),
+                           file=sys.stdout)
 
 
-def find_face(img_tuple: Tuple[Path, ImageInfo], face_cache: NdarrayCache, face_selection_overrides: bytes,
-              error_dir: str) -> Tuple[Path, ImageInfo]:
+def find_face(frame: Frame, face_cache: NdarrayCache, face_selection_overrides: bytes,
+              error_dir: str) -> Frame:
     """
-    Finds the face in [img_tuple], expressed as the positions of the eyes, caching the face data in [face_cache].
+    Finds the face in [frame], expressed as the positions of the eyes, writing the coordinates into key `"eyes"`,
+    additionally caching the face data in [face_cache].
 
     Raises a [UserException] if no or multiple faces are found in an image, and [g_face_selection_overrides] is not
     configured for this image. Additionally, if an exception is thrown, the image is written to [error_dir] with
     visualized debugging information.
 
-    :param img_tuple: the original input path and the pre-processing data of the image to find a face in
+    :param frame: the frame containing the original input image to find a face in
     :param face_cache: the cache to store the found face in
     :param face_selection_overrides: dill serialization of dictionary from image names to sorting function to select
     which face to use in case an image has multiple faces
     :param error_dir: the directory to write debugging information in to assist the user
-    :return: the original input path and the found face
+    :return: the processed frame with key `"eyes"` containing the face's coordinates
     """
 
-    img_path, img_data = img_tuple
-    if face_cache.has(img_data["hash"]):
-        return img_path, {"eyes": face_cache.load(img_data["hash"])}
+    # TODO: Operate on original image, or in specific layer?
+    if face_cache.has(frame["hash"]):
+        frame["eyes"] = face_cache.load(frame["hash"])
+        return frame
 
     # Initialize face recognition
     face_selection_overrides = dill.loads(face_selection_overrides)
@@ -95,7 +96,7 @@ def find_face(img_tuple: Tuple[Path, ImageInfo], face_cache: NdarrayCache, face_
     shape_predictor = dlib.shape_predictor(str(Resolver.resource_path("shape_predictor_5_face_landmarks.dat")))
 
     # Find face
-    img = load_image(img_path)
+    img = load_image(frame["path"])
     img_np = np.array(img)
     faces = dlib.full_object_detections()
     detections = detector(img_np, 1)
@@ -104,11 +105,11 @@ def find_face(img_tuple: Tuple[Path, ImageInfo], face_cache: NdarrayCache, face_
 
     # Determine what to do if there are multiple faces
     if len(faces) == 0:
-        raise UserException(f"Not enough faces: Found 0 faces in '{img_path}'.")
+        raise UserException(f"Not enough faces: Found 0 faces in '{frame['path']}'.")
     elif len(faces) == 1:
         face = faces[0]
     else:
-        img_name = img_path.name  # Includes file extension
+        img_name = frame["path"].name  # Includes file extension
 
         if img_name in face_selection_overrides:
             face = sorted(list(faces), key=face_selection_overrides[img_name])[0]
@@ -122,7 +123,7 @@ def find_face(img_tuple: Tuple[Path, ImageInfo], face_cache: NdarrayCache, face_
 
             img.save(f"{error_dir}/{img_name}")
 
-            raise UserException(f"Too many faces: Found {len(faces)} in '{img_path}'. "
+            raise UserException(f"Too many faces: Found {len(faces)} in '{frame['path']}'. "
                                 f"The image has been stored in '{error_dir}' with squares drawn around all faces that "
                                 f"were found. "
                                 f"You can select which face should be used by adjusting the 'face_selection_override' "
@@ -132,6 +133,6 @@ def find_face(img_tuple: Tuple[Path, ImageInfo], face_cache: NdarrayCache, face_
     # Store results
     eyes = np.vstack([(np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(2, 4)]), axis=0)),
                       (np.mean(np.array([(face.part(i).x, face.part(i).y) for i in range(0, 2)]), axis=0))])
-    face_cache.cache(eyes, img_data["hash"])
-
-    return img_path, {"eyes": eyes}
+    face_cache.cache(eyes, frame["hash"])
+    frame["eyes"] = eyes
+    return frame
