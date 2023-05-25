@@ -8,7 +8,7 @@ from stages.CaptionStage import CaptionStage
 from stages.FfmpegStage import FfmpegStage
 from stages.FindFacesStage import FindFacesStage
 from stages.NormalizeStage import NormalizeStage
-from stages.ReadMetadataStage import ReadMetadataStage
+from stages.CalculateHashStage import CalculateHashStage
 
 error_info = f"If you think this is a bug, consider opening an issue at " \
              f"https://github.com/FWDekker/facemation/issues. " \
@@ -42,11 +42,11 @@ def main() -> None:
     cfg = load_config()
 
     pipeline = Pipeline()
-    pipeline.register(ReadMetadataStage())
+    pipeline.register(CalculateHashStage())
     pipeline.register(FindFacesStage(cfg["find_faces"], cfg["pipeline"]["cache_dir"]))
     pipeline.register(NormalizeStage(0, 0, cfg["pipeline"]["cache_dir"]))
     if cfg["caption"]["enabled"]:
-        pipeline.register(CaptionStage(1, cfg["pipeline"]["cache_dir"], cfg["caption"]["generator"]))
+        pipeline.register(CaptionStage(0, 1, cfg["pipeline"]["cache_dir"], cfg["caption"]["generator"]))
     if cfg["ffmpeg"]["enabled"]:
         pipeline.register(FfmpegStage([0, 1], cfg["ffmpeg"]))
 

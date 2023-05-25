@@ -70,6 +70,8 @@ config = {
         "crf": 23,
         # The video filters to apply when creating the output video.
         "video_filters": [
+            # Required. Ensures captions are displayed correctly.
+            "overlay",
             # Pauses the first frame for 1 second at the start.
             "tpad=start_mode=clone:start_duration=1",
             # Pauses the last frame for 3 seconds at the end.

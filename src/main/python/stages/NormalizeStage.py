@@ -8,6 +8,7 @@ from PIL import Image
 from tqdm import tqdm
 
 import Hasher
+import ImageLoader
 from Cache import ImageCache
 from ImageLoader import load_image
 from Pipeline import Frame, Stage
@@ -51,7 +52,8 @@ class NormalizeStage(Stage):
         eye_dists = [math.dist(it[0], it[1]) for it in eyes]
         min_eye_dist = np.min(np.array(eye_dists))
         scales = [min_eye_dist / it for it in eye_dists]
-        scaled_img_dims = [(scales[idx] * frames[idx]["dims"]).astype(int) for idx in range(len(frames))]
+        dims = [np.array(ImageLoader.get_dims(it["path"])) for it in frames]
+        scaled_img_dims = [(scales[idx] * dims[idx]).astype(int) for idx in range(len(frames))]
 
         # Find translation to align eyes
         eye_centers = [np.mean([it[0], it[1]], axis=0).astype(int) for it in eyes]

@@ -43,7 +43,7 @@ class Cache(ABC, Generic[T]):
         self.prefix = prefix
         self.suffix = suffix
 
-    def path(self, key: str, state: str) -> Path:
+    def path(self, key: str, state: str = "") -> Path:
         """
         Returns the path to the data cached under [key] and [state].
 

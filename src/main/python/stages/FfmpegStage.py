@@ -68,17 +68,17 @@ class FfmpegStage(Stage):
         args += ["-stats"]
         args += ["-y"]
         args += ["-f", "image2"]
-        args += ["-r", str(self.cfg["fps"])]
         args += self.cfg["custom_global_options"]
         for layer_in in self.layers_in:
             # TODO: Detect extension better!
             extension = Path(glob.glob(f"{self.cfg['frames_dir']}/*-{layer_in}.*")[0]).suffix
+            args += ["-r", str(self.cfg["fps"])]
             args += ["-i", f"{self.cfg['frames_dir']}/%d-{layer_in}{extension}"]
             args += self.cfg["custom_inputs"]
         args += ["-vcodec", self.cfg["codec"]]
         args += ["-crf", str(self.cfg["crf"])]
         if len(self.cfg["video_filters"]) > 0:
-            args += ["-vf", ",".join(self.cfg["video_filters"])]
+            args += ["-filter_complex", ",".join(self.cfg["video_filters"])]
         args += self.cfg["custom_output_options"]
         args += [self.cfg["output_path"]]
 
@@ -95,11 +95,12 @@ class FfmpegStage(Stage):
         print("Combining frames into a video:")
         self.prepare_frames(frames)
         args = self.create_args()
+        print(' '.join(args))
 
         try:
             subprocess.run(args, stderr=sys.stdout, check=True)
 
-            print(f"Your video has been saved in {Path(self.cfg['output_path']).resolve()}.")
+            print(f"Your video has been saved in {Path(self.cfg['output_path']).resolve()}")
         except Exception as exception:
             raise UserException("FFmpeg failed to create a video. "
                                 "Read the messages above for more information.", exception) from None
